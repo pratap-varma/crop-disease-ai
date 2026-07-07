@@ -1,8 +1,8 @@
-import base64
 import json
 import mimetypes
+
 from PIL import Image
-import requests
+import google.generativeai as genai
 
 from config import Config
 
@@ -13,39 +13,14 @@ def _get_api_key():
         raise RuntimeError(
             "Gemini API key is not configured. Set GEMINI_API_KEY in the environment."
         )
-
     return api_key
 
 
-def _build_payload(prompt, image_path):
-    mime_type, _ = mimetypes.guess_type(image_path)
-    mime_type = mime_type or "image/png"
-
-    with open(image_path, "rb") as f:
-        image_bytes = f.read()
-
-    return {
-        "contents": [
-            {
-                "role": "user",
-                "parts": [
-                    {"text": prompt},
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": base64.b64encode(image_bytes).decode("utf-8"),
-                        }
-                    },
-                ],
-            }
-        ]
-    }
-
-
 def analyze_crop_disease(image_path):
-    """Analyze a crop image using Gemini AI and return structured JSON."""
+    """Analyze crop image using Gemini AI."""
 
     api_key = _get_api_key()
+    genai.configure(api_key=api_key)
 
     prompt = """
 You are an expert agricultural scientist.
@@ -69,48 +44,39 @@ Return ONLY valid JSON.
 }
 
 Rules:
-1. Return ONLY JSON.
-2. Do not use markdown.
-3. Confidence should be High, Medium, or Low.
-4. Severity should be Mild, Moderate, Severe, or Healthy.
-5. Symptoms, causes, prevention, and treatment should each contain 3 to 5 points.
-6. If the crop is healthy:
-   - disease_name = "Healthy"
-   - severity = "Healthy"
+1. Return ONLY valid JSON.
+2. No markdown.
+3. Confidence: High, Medium or Low.
+4. Severity: Healthy, Mild, Moderate or Severe.
+5. Each list must contain 3-5 points.
 """
 
     try:
-        with Image.open(image_path) as image:
-            image.verify()
+        with Image.open(image_path) as img:
+            img.verify()
 
-        payload = _build_payload(prompt, image_path)
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta/"
-           f"models/gemini-1.5-flash:generateContent?key={api_key}"
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        mime_type = mimetypes.guess_type(image_path)[0] or "image/png"
+
+        with open(image_path, "rb") as f:
+            image_bytes = f.read()
+
+        response = model.generate_content(
+            [
+                prompt,
+                {
+                    "mime_type": mime_type,
+                    "data": image_bytes,
+                },
+            ]
         )
 
-        response = requests.post(url, json=payload, timeout=90)
-        response.raise_for_status()
-        data = response.json()
-
-        if "error" in data:
-            raise RuntimeError(data["error"].get("message", "Gemini API error"))
-
-        result_text = ""
-        candidates = data.get("candidates", [])
-        if candidates:
-            parts = candidates[0].get("content", {}).get("parts", [])
-            result_text = " ".join(
-                part.get("text", "") for part in parts if part.get("text")
-            ).strip()
-
-        if not result_text:
-            raise ValueError("Gemini returned an empty response.")
+        result_text = response.text.strip()
 
         if result_text.startswith("```"):
             result_text = (
-                result_text
-                .replace("```json", "")
+                result_text.replace("```json", "")
                 .replace("```", "")
                 .strip()
             )
@@ -118,7 +84,6 @@ Rules:
         return json.loads(result_text)
 
     except json.JSONDecodeError:
-
         return {
             "crop_name": "Unknown",
             "disease_name": "Unable to Detect",
@@ -130,18 +95,10 @@ Rules:
             "treatment": [],
             "fertilizer_recommendation": "",
             "watering_advice": "",
-            "additional_notes": "Gemini returned an invalid response."
+            "additional_notes": "Gemini returned invalid JSON."
         }
 
     except Exception as e:
-
-        error_message = str(e)
-        if "401" in error_message or "Unauthorized" in error_message:
-            error_message = (
-                "Gemini authentication failed. Please replace the API key in the .env file "
-                "with a valid Google AI Studio API key."
-            )
-
         return {
             "crop_name": "Unknown",
             "disease_name": "Error",
@@ -153,5 +110,5 @@ Rules:
             "treatment": [],
             "fertilizer_recommendation": "",
             "watering_advice": "",
-            "additional_notes": error_message
+            "additional_notes": str(e)
         }
