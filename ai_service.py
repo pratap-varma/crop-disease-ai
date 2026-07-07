@@ -86,7 +86,7 @@ Rules:
         payload = _build_payload(prompt, image_path)
         url = (
             "https://generativelanguage.googleapis.com/v1beta/"
-            f"models/gemini-2.5-flash:generateContent?key={api_key}"
+           f"models/gemini-1.5-flash:generateContent?key={api_key}"
         )
 
         response = requests.post(url, json=payload, timeout=90)
