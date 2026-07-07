@@ -1,83 +1,66 @@
 <div id="google_translate_element" class="flex items-center"></div>
 
 <script type="text/javascript">
-function getTranslateCookie(name) {
-    var value = "; " + document.cookie;
-    var parts = value.split("; " + name + "=");
-    if (parts.length == 2) return parts.pop().split(";").shift();
-    return null;
+function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+        pageLanguage: "en",
+        includedLanguages: "en,hi,te",
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+    }, "google_translate_element");
 }
 
-function googleTranslateElementInit() {
-  new google.translate.TranslateElement({
-    pageLanguage: 'en',
-    includedLanguages: 'en,hi,te',
-    layout: google.translate.TranslateElement.InlineLayout.SIMPLE
-  }, 'google_translate_element');
+function setActiveButton(langCode) {
+    const buttons = {
+        en: document.getElementById("btn-en"),
+        hi: document.getElementById("btn-hi"),
+        te: document.getElementById("btn-te")
+    };
+
+    Object.values(buttons).forEach(btn => {
+        if (btn) {
+            btn.classList.remove("border-green-500", "bg-green-50", "text-green-700", "scale-105");
+            btn.classList.add("border-gray-200", "bg-white");
+        }
+    });
+
+    if (buttons[langCode]) {
+        buttons[langCode].classList.remove("border-gray-200", "bg-white");
+        buttons[langCode].classList.add("border-green-500", "bg-green-50", "text-green-700", "scale-105");
+    }
 }
 
 function translatePage(langCode) {
-    // Set google translation cookies
+    setActiveButton(langCode);
+    localStorage.setItem("selectedLang", langCode);
+
     document.cookie = "googtrans=/en/" + langCode + "; path=/";
     document.cookie = "googtrans=/en/" + langCode + "; path=/; domain=" + location.hostname;
-    document.cookie = "googtrans=/en/" + langCode + "; path=/; domain=127.0.0.1";
-    document.cookie = "googtrans=/en/" + langCode + "; path=/; domain=localhost";
 
-    // Attempt to change dropdown
-    var selectEl = document.querySelector('.goog-te-combo');
-    if (selectEl) {
-        selectEl.value = langCode;
-        selectEl.dispatchEvent(new Event('change'));
-    }
-    
-    // Refresh to apply changes immediately and cleanly
-    location.reload();
+    setTimeout(function () {
+        location.reload();
+    }, 500);
 }
 
-// Highlight the active language card/button on DOM load
-document.addEventListener("DOMContentLoaded", function() {
-    var cookieVal = getTranslateCookie("googtrans");
-    var activeLang = "en";
-    if (cookieVal) {
-        var parts = cookieVal.split("/");
-        if (parts.length >= 3) {
-            activeLang = parts[2].toLowerCase();
-        }
-    }
-    
-    var btnEn = document.getElementById("btn-en");
-    var btnHi = document.getElementById("btn-hi");
-    var btnTe = document.getElementById("btn-te");
-    
-    if (btnEn && btnHi && btnTe) {
-        [btnEn, btnHi, btnTe].forEach(function(btn) {
-            btn.classList.remove("border-green-500", "bg-green-50", "text-green-700");
-        });
-        
-        if (activeLang === "en" && btnEn) {
-            btnEn.classList.add("border-green-500", "bg-green-50");
-        } else if (activeLang === "hi" && btnHi) {
-            btnHi.classList.add("border-green-500", "bg-green-50");
-        } else if (activeLang === "te" && btnTe) {
-            btnTe.classList.add("border-green-500", "bg-green-50");
-        }
-    }
-    // Toggle Profile Dropdown
-    const badgeBtn = document.getElementById('profileBadgeBtn');
-    const dropdownMenu = document.getElementById('profileDropdownMenu');
-    
+document.addEventListener("DOMContentLoaded", function () {
+    const activeLang = localStorage.getItem("selectedLang") || "en";
+    setActiveButton(activeLang);
+
+    const badgeBtn = document.getElementById("profileBadgeBtn");
+    const dropdownMenu = document.getElementById("profileDropdownMenu");
+
     if (badgeBtn && dropdownMenu) {
-        badgeBtn.addEventListener('click', function(e) {
+        badgeBtn.addEventListener("click", function (e) {
             e.stopPropagation();
-            dropdownMenu.classList.toggle('hidden');
+            dropdownMenu.classList.toggle("hidden");
         });
-        
-        document.addEventListener('click', function(e) {
+
+        document.addEventListener("click", function (e) {
             if (!dropdownMenu.contains(e.target) && e.target !== badgeBtn) {
-                dropdownMenu.classList.add('hidden');
+                dropdownMenu.classList.add("hidden");
             }
         });
     }
 });
 </script>
+
 <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
