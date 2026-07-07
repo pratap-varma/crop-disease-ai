@@ -1,0 +1,402 @@
+/* ===========================
+   Google Font
+=========================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Poppins',sans-serif;
+}
+
+html{
+    scroll-behavior:smooth;
+}
+
+body{
+    background:#f8fafc;
+    color:#1f2937;
+}
+
+/* ===========================
+   Navbar
+=========================== */
+
+nav{
+    transition:0.3s;
+}
+
+nav a{
+    transition:.3s;
+}
+
+nav a:hover{
+    color:#15803d;
+}
+
+/* ===========================
+   Buttons
+=========================== */
+
+button,
+.btn{
+
+    transition:.3s ease;
+
+}
+
+button:hover,
+.btn:hover{
+
+    transform:translateY(-3px);
+    box-shadow:0 12px 30px rgba(0,0,0,.15);
+
+}
+
+/* ===========================
+   Cards
+=========================== */
+
+.card{
+
+    background:white;
+
+    border-radius:20px;
+
+    box-shadow:0 15px 40px rgba(0,0,0,.08);
+
+    transition:.35s;
+
+}
+
+.card:hover{
+
+    transform:translateY(-8px);
+
+    box-shadow:0 20px 50px rgba(0,0,0,.15);
+
+}
+
+/* ===========================
+   Upload Box
+=========================== */
+
+#dropArea{
+
+    transition:.3s;
+
+}
+
+#dropArea:hover{
+
+    background:#ecfdf5;
+
+    border-color:#16a34a;
+
+}
+
+#dropArea.dragover{
+
+    background:#dcfce7;
+
+    transform:scale(1.02);
+
+}
+
+/* ===========================
+   Preview Image
+=========================== */
+
+#previewImage{
+
+    max-width:100%;
+
+    max-height:350px;
+
+    border-radius:25px;
+
+    border:6px solid white;
+
+    box-shadow:0 15px 40px rgba(0,0,0,.2);
+
+}
+
+/* ===========================
+   Loading Spinner
+=========================== */
+
+#loading{
+
+    animation:fadeIn .5s;
+
+}
+
+@keyframes fadeIn{
+
+    from{
+
+        opacity:0;
+
+    }
+
+    to{
+
+        opacity:1;
+
+    }
+
+}
+
+.animate-spin{
+
+    animation:spin 1s linear infinite;
+
+}
+
+@keyframes spin{
+
+    from{
+
+        transform:rotate(0deg);
+
+    }
+
+    to{
+
+        transform:rotate(360deg);
+
+    }
+
+}
+
+/* ===========================
+   Result Section
+=========================== */
+
+#resultSection{
+
+    animation:slideUp .7s;
+
+}
+
+@keyframes slideUp{
+
+    from{
+
+        opacity:0;
+
+        transform:translateY(50px);
+
+    }
+
+    to{
+
+        opacity:1;
+
+        transform:translateY(0);
+
+    }
+
+}
+
+/* ===========================
+   Lists
+=========================== */
+
+ul{
+
+    line-height:2;
+
+}
+
+/* ===========================
+   Feature Cards
+=========================== */
+
+.feature-card{
+
+    background:white;
+
+    padding:35px;
+
+    border-radius:25px;
+
+    box-shadow:0 15px 35px rgba(0,0,0,.08);
+
+    transition:.35s;
+
+}
+
+.feature-card:hover{
+
+    transform:translateY(-10px);
+
+}
+
+.feature-card i{
+
+    font-size:55px;
+
+    color:#16a34a;
+
+    margin-bottom:20px;
+
+}
+
+/* ===========================
+   Footer
+=========================== */
+
+footer{
+
+    margin-top:80px;
+
+}
+
+footer p{
+
+    color:#d1fae5;
+
+}
+
+/* ===========================
+   Scrollbar
+=========================== */
+
+::-webkit-scrollbar{
+
+    width:10px;
+
+}
+
+::-webkit-scrollbar-thumb{
+
+    background:#16a34a;
+
+    border-radius:20px;
+
+}
+
+::-webkit-scrollbar-track{
+
+    background:#f1f5f9;
+
+}
+
+/* ===========================
+   Responsive
+=========================== */
+
+@media(max-width:768px){
+
+    h1{
+
+        font-size:2.5rem !important;
+
+    }
+
+    h2{
+
+        font-size:2rem !important;
+
+    }
+
+    nav .space-x-8{
+
+        display:none;
+
+    }
+
+    #dropArea{
+
+        padding:40px 20px;
+
+    }
+
+    button{
+
+        width:100%;
+
+    }
+
+}
+
+/* Hide Google Translate element widget from navbar */
+#google_translate_element {
+    display: none !important;
+}
+
+/* Prevent shifting / banner display / margins */
+html,
+body,
+.translated-ltr,
+.translated-rtl {
+    top: 0px !important;
+    margin-top: 0px !important;
+    position: static !important;
+}
+
+/* Force override Google Translate iframe top position and visibility */
+iframe.goog-te-banner-frame,
+.goog-te-banner-frame,
+.skiptranslate,
+#goog-gt-tt,
+.goog-tooltip,
+.goog-tooltip:hover {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0px !important;
+    width: 0px !important;
+}
+
+.goog-text-highlight {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Hide branding and frame elements inside the widget container */
+.goog-logo-link,
+.goog-te-gadget span,
+.goog-te-gadget a,
+.goog-te-gadget form,
+.goog-te-gadget div {
+    display: none !important;
+}
+.goog-te-gadget {
+    color: transparent !important;
+    font-size: 0px !important;
+}
+
+/* Style the select dropdown dropdown box */
+.goog-te-gadget .goog-te-combo {
+    display: inline-block !important;
+    color: #1f2937 !important;
+    background-color: #ffffff !important;
+    border: 1.5px solid #d1d5db !important;
+    border-radius: 9999px !important;
+    padding: 0.5rem 2rem 0.5rem 1rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+    outline: none !important;
+    transition: all 0.2s ease-in-out !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234b5563' stroke-width='2'><path stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/></svg>") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 0.75rem center !important;
+    background-size: 1rem !important;
+}
+
+.goog-te-gadget .goog-te-combo:hover {
+    border-color: #16a34a !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.goog-te-gadget .goog-te-combo:focus {
+    border-color: #16a34a !important;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+}

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile | CropDiseaseAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-green-50 min-h-screen flex flex-col">
+<nav class="bg-white shadow-lg">
+    <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-5">
+        <a href="/" class="text-3xl font-bold text-green-700">🌱 CropDiseaseAI</a>
+        <div class="flex items-center space-x-6">
+            {% include 'translator.html' %}
+            <div class="space-x-8 font-semibold flex items-center">
+                <a href="/" class="text-gray-700 hover:text-green-700 transition">Home</a>
+                <a href="/detect" class="text-gray-700 hover:text-green-700 transition">Detect</a>
+                <a href="/history" class="text-gray-700 hover:text-green-700 transition">History</a>
+                <a href="/awareness" class="text-gray-700 hover:text-green-700 transition">Awareness</a>
+                <a href="/about" class="text-gray-700 hover:text-green-700 transition">About</a>
+                <a href="/contact" class="text-gray-700 hover:text-green-700 transition">Contact</a>
+                <div class="relative inline-block text-left" id="profileDropdownContainer">
+                    <button type="button" id="profileBadgeBtn" class="w-10 h-10 bg-green-100 border border-green-200 text-green-700 hover:bg-green-200 rounded-full flex items-center justify-center font-bold text-lg focus:outline-none transition">
+                        {{ session.get('username')[0] | upper }}
+                    </button>
+                    <div id="profileDropdownMenu" class="hidden absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-2xl border border-gray-100 py-2 z-50 origin-top-right">
+                        <div class="px-4 py-2 border-b border-gray-100 text-left">
+                            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Signed in as</p>
+                            <p class="text-sm font-bold text-gray-800 truncate">{{ session.get('username') }}</p>
+                        </div>
+                        <a href="/profile" class="flex items-center px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                            <i class="fas fa-user-circle mr-3 text-lg"></i>
+                            Profile
+                        </a>
+                        <div class="px-4 py-2 border-t border-b border-gray-100 bg-gray-50/50 text-left">
+                            <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider mb-2">Change Language</p>
+                            <div class="flex space-x-2">
+                                <button onclick="translatePage('en')" class="px-2 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white hover:border-green-500 hover:text-green-700 transition">EN</button>
+                                <button onclick="translatePage('hi')" class="px-2 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white hover:border-green-500 hover:text-green-700 transition">HI</button>
+                                <button onclick="translatePage('te')" class="px-2 py-1 text-xs font-semibold rounded-lg border border-gray-200 bg-white hover:border-green-500 hover:text-green-700 transition">TE</button>
+                            </div>
+                        </div>
+                        <a href="/logout" class="flex items-center px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">
+                            <i class="fas fa-sign-out-alt mr-3 text-lg"></i>
+                            Sign Out
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="py-20 flex-grow">
+    <div class="max-w-md mx-auto bg-white rounded-3xl shadow-xl p-10 text-center">
+        <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span class="text-green-700 text-4xl font-bold uppercase">{{ user.username[0] }}</span>
+        </div>
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ user.username }}</h1>
+        <p class="text-green-600 font-semibold text-sm mb-6">Registered User</p>
+        
+        <div class="border-t border-b border-gray-100 py-4 my-6 text-left space-y-3">
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Account Status:</span>
+                <span class="text-green-700 font-medium text-sm">Active</span>
+            </div>
+            {% if user.email %}
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Email:</span>
+                <span class="text-gray-800 font-medium text-sm">{{ user.email }}</span>
+            </div>
+            {% endif %}
+            <div class="flex justify-between">
+                <span class="text-gray-500 text-sm">Member Since:</span>
+                <span class="text-gray-800 font-medium text-sm">{{ user.created_at[:10] }}</span>
+            </div>
+        </div>
+        
+        <a href="{{ url_for('logout') }}" class="block w-full text-center bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl transition">
+            Log Out
+        </a>
+    </div>
+</main>
+
+<footer class="bg-green-800 text-white py-8 text-center">
+    © 2026 CropDiseaseAI
+</footer>
+</body>
+</html>
