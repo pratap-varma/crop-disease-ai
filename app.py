@@ -16,14 +16,20 @@ app.secret_key = os.environ.get("SECRET_KEY", "crop-disease-secret-key")
 # -----------------------------
 # Configuration
 # -----------------------------
-app.config["UPLOAD_FOLDER"] = Config.UPLOAD_FOLDER
+if os.environ.get("VERCEL"):
+    app.config["UPLOAD_FOLDER"] = "/tmp"
+else:
+    app.config["UPLOAD_FOLDER"] = Config.UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = Config.MAX_CONTENT_LENGTH
 
 # Create upload folder if it doesn't exist
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 DB_NAME = "crop_disease.db"
-DB_PATH = os.path.join(os.path.dirname(__file__), DB_NAME)
+if os.environ.get("VERCEL"):
+    DB_PATH = os.path.join("/tmp", DB_NAME)
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), DB_NAME)
 
 
 def get_db():

@@ -18,7 +18,7 @@ class AIServiceTests(unittest.TestCase):
             Image.new("RGB", (80, 80), color="green").save(image_path)
 
             with patch("ai_service._get_api_key", return_value="dummy-key"), patch(
-                "ai_service.requests.post", side_effect=requests.RequestException("Gemini error: boom")
+                "google.generativeai.GenerativeModel.generate_content", side_effect=Exception("Gemini error: boom")
             ):
                 result = analyze_crop_disease(image_path)
 
