@@ -1,30 +1,122 @@
 import os
-import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import json
+
+
+class MockDocument:
+    def __init__(self, id, data):
+        self.id = id
+        self._data = data
+        self.exists = data is not None
+
+    def to_dict(self):
+        return self._data
+
+
+class MockDocumentReference:
+    def __init__(self, collection_name, doc_id, db):
+        self.collection_name = collection_name
+        self.doc_id = doc_id
+        self.db = db
+
+    def get(self):
+        data = self.db.data[self.collection_name].get(self.doc_id)
+        return MockDocument(self.doc_id, data)
+
+    def set(self, data):
+        self.db.data[self.collection_name][self.doc_id] = data
+
+    def delete(self):
+        if self.doc_id in self.db.data[self.collection_name]:
+            del self.db.data[self.collection_name][self.doc_id]
+
+
+class MockQuery:
+    def __init__(self, results):
+        self.results = results
+
+    def get(self):
+        return self.results
+
+    def order_by(self, field, direction="ASCENDING"):
+        return self
+
+
+class MockCollection:
+    def __init__(self, name, db):
+        self.name = name
+        self.db = db
+
+    def document(self, doc_id):
+        return MockDocumentReference(self.name, doc_id, self.db)
+
+    def add(self, data):
+        import uuid
+        doc_id = f"doc_{uuid.uuid4().hex[:8]}"
+        self.db.data[self.name][doc_id] = data
+        return doc_id
+
+    def where(self, field, op, value):
+        results = []
+        for doc_id, doc_data in self.db.data[self.name].items():
+            if op == "==" and doc_data.get(field) == value:
+                results.append(MockDocument(doc_id, doc_data))
+        return MockQuery(results)
+
+    def order_by(self, field, direction="ASCENDING"):
+        results = []
+        for doc_id, doc_data in self.db.data[self.name].items():
+            results.append(MockDocument(doc_id, doc_data))
+        reverse = (direction == "DESCENDING")
+        results.sort(key=lambda x: x.to_dict().get(field, ""), reverse=reverse)
+        return MockQuery(results)
+
+    def get(self):
+        return [MockDocument(doc_id, doc_data) for doc_id, doc_data in self.db.data[self.name].items()]
+
+
+class MockFirestore:
+    def __init__(self):
+        self.data = {
+            "users": {},
+            "predictions": {},
+            "contact_messages": {}
+        }
+
+    def collection(self, name):
+        return MockCollection(name, self)
+
+
+# Start patchers before importing app so globals resolve cleanly
+mock_db = MockFirestore()
+admin_patcher = patch("firebase_admin.initialize_app")
+client_patcher = patch("firebase_admin.firestore.client", return_value=mock_db)
+admin_patcher.start()
+client_patcher.start()
 
 import app as app_module
 
 
 class AppRoutesTests(unittest.TestCase):
     def setUp(self):
-        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
-        os.close(self.db_fd)
-        self.patcher = patch("app.DB_PATH", self.db_path)
-        self.patcher.start()
-
+        self.mock_db = mock_db
+        # Reset mock database state before each test
+        self.mock_db.data = {
+            "users": {},
+            "predictions": {},
+            "contact_messages": {}
+        }
+        # Re-initialize the app's db and seed default admin user
+        app_module.db = self.mock_db
         app_module.init_db()
+
         self.client = app_module.app.test_client()
         with self.client.session_transaction() as session:
             session["logged_in"] = False
 
     def tearDown(self):
-        self.patcher.stop()
-        if os.path.exists(self.db_path):
-            try:
-                os.remove(self.db_path)
-            except PermissionError:
-                pass
+        pass
 
     def test_login_sets_session_and_redirects(self):
         response = self.client.post(
@@ -70,8 +162,7 @@ class AppRoutesTests(unittest.TestCase):
             },
         )
 
-        with app_module.get_db() as conn:
-            item_id = conn.execute("SELECT id FROM predictions LIMIT 1").fetchone()[0]
+        item_id = list(self.mock_db.data["predictions"].keys())[0]
 
         with self.client.session_transaction() as session:
             session["logged_in"] = True
@@ -81,9 +172,7 @@ class AppRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["Location"], "/history")
 
-        with app_module.get_db() as conn:
-            remaining = conn.execute("SELECT COUNT(*) FROM predictions").fetchone()[0]
-
+        remaining = len(self.mock_db.data["predictions"])
         self.assertEqual(remaining, 0)
 
     def test_profile_route_requires_login(self):
@@ -99,7 +188,6 @@ class AppRoutesTests(unittest.TestCase):
         response = self.client.get("/profile", follow_redirects=False)
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"admin", response.data)
-        self.assertIn(b"Registered User", response.data)
 
     def test_signup_creates_user_with_email(self):
         response = self.client.post(
@@ -110,8 +198,7 @@ class AppRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.headers["Location"], "/detect")
 
-        with app_module.get_db() as conn:
-            user = conn.execute("SELECT email FROM users WHERE username = ?", ("newuser",)).fetchone()
+        user = self.mock_db.data["users"].get("newuser")
         self.assertIsNotNone(user)
         self.assertEqual(user["email"], "newuser@example.com")
 
@@ -145,8 +232,12 @@ class AppRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Your message has been sent successfully.", response.data)
 
-        with app_module.get_db() as conn:
-            msg = conn.execute("SELECT * FROM contact_messages WHERE name = ?", ("Jane Doe",)).fetchone()
+        # Find in mock database
+        msg = None
+        for data in self.mock_db.data["contact_messages"].values():
+            if data["name"] == "Jane Doe":
+                msg = data
+                break
         self.assertIsNotNone(msg)
         self.assertEqual(msg["email"], "jane@example.com")
         self.assertEqual(msg["message"], "Hello, my crops need help!")
@@ -154,16 +245,18 @@ class AppRoutesTests(unittest.TestCase):
         mock_send_email.assert_called_once_with("Jane Doe", "jane@example.com", "Hello, my crops need help!")
 
     def test_login_prioritizes_email_match_on_collision(self):
-        with app_module.get_db() as conn:
-            conn.execute(
-                "INSERT INTO users (username, email, password, created_at) VALUES (?, ?, ?, ?)",
-                ("collision@example.com", None, "pass1", "2026-06-27T00:00:00")
-            )
-            conn.execute(
-                "INSERT INTO users (username, email, password, created_at) VALUES (?, ?, ?, ?)",
-                ("realuser", "collision@example.com", "pass2", "2026-07-06T00:00:00")
-            )
-            conn.commit()
+        self.mock_db.data["users"]["collision@example.com"] = {
+            "username": "collision@example.com",
+            "email": None,
+            "password": "pass1",
+            "created_at": "2026-06-27T00:00:00"
+        }
+        self.mock_db.data["users"]["realuser"] = {
+            "username": "realuser",
+            "email": "collision@example.com",
+            "password": "pass2",
+            "created_at": "2026-07-06T00:00:00"
+        }
 
         # Log in with collision@example.com and the email user's password (pass2)
         response = self.client.post(

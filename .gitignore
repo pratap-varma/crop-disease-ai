@@ -5,3 +5,4 @@ uploads/
 *.db
 .vercel
 .env*
+serviceAccountKey.json
