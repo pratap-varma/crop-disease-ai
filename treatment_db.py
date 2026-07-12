@@ -2,7 +2,10 @@ import os
 import sqlite3
 import json
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "treatments.db")
+if os.environ.get("VERCEL"):
+    DB_PATH = "/tmp/treatments.db"
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "treatments.db")
 
 def init_treatment_db():
     """Initializes the treatments table in the SQLite database and seeds it if empty."""
