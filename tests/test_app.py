@@ -280,6 +280,74 @@ class AppRoutesTests(unittest.TestCase):
             self.assertTrue(session["logged_in"])
             self.assertEqual(session["username"], "collision@example.com")
 
+    def test_treatment_guidance_lookup_exact_and_fuzzy(self):
+        from treatment_db import get_treatment_guidance, init_treatment_db
+        # Ensure database is initialized
+        init_treatment_db()
+
+        # Exact match
+        result1 = get_treatment_guidance("Tomato", "Late Blight")
+        self.assertIsNotNone(result1)
+        self.assertEqual(result1["chemical_treatment_name"], "Mancozeb 75% WP")
+        self.assertEqual(result1["disease_type"], "Fungal")
+        self.assertIn("Remove infected leaves", result1["organic_treatment_json"])
+
+        # Fuzzy match
+        result2 = get_treatment_guidance("Tomato plant", "Late Blight of Tomato")
+        self.assertIsNotNone(result2)
+        self.assertEqual(result2["chemical_treatment_name"], "Mancozeb 75% WP")
+
+        # Corn/Maize synonym match
+        result_corn = get_treatment_guidance("Maize", "Ear Rot")
+        self.assertIsNotNone(result_corn)
+        self.assertEqual(result_corn["chemical_treatment_name"], "Propiconazole 25% EC")
+        self.assertEqual(result_corn["crop_name"], "Corn")
+
+        # Blossom End Rot match
+        result_ber = get_treatment_guidance("Tomato", "Blossom End Rot with secondary soft rot")
+        self.assertIsNotNone(result_ber)
+        self.assertEqual(result_ber["chemical_treatment_name"], "Calcium Chloride 30% SL")
+
+        # Common Scab match
+        result_scab = get_treatment_guidance("Potato", "Common Scab")
+        self.assertIsNotNone(result_scab)
+        self.assertEqual(result_scab["chemical_treatment_name"], "Streptomycin Sulfate 9% WP")
+
+        # No match
+        result3 = get_treatment_guidance("Wheat", "Unknown Rot")
+        self.assertIsNone(result3)
+
+    @patch("app.analyze_crop_disease")
+    def test_predict_route_returns_treatment_guidance(self, mock_analyze):
+        mock_analyze.return_value = {
+            "crop_name": "Tomato",
+            "disease_name": "Late Blight",
+            "confidence": "High",
+            "severity": "Moderate",
+            "symptoms": ["Dark brown spots"],
+            "possible_causes": ["High humidity"],
+            "prevention": ["Crop rotation"],
+            "treatment": ["Fungicide"],
+            "fertilizer_recommendation": "NPK",
+            "watering_advice": "Drip irrigation",
+            "additional_notes": "None"
+        }
+
+        # Mock Firestore save prediction to do nothing
+        with patch("app.save_prediction") as mock_save:
+            # We mock the post request
+            import io
+            response = self.client.post(
+                "/predict",
+                data={"image": (io.BytesIO(b"dummy image data"), "test.jpg")},
+                content_type="multipart/form-data"
+            )
+            self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data.decode("utf-8"))
+            self.assertTrue(data["success"])
+            self.assertIsNotNone(data["treatment_guidance"])
+            self.assertEqual(data["treatment_guidance"]["chemical_treatment_name"], "Mancozeb 75% WP")
+
 
 if __name__ == "__main__":
     unittest.main()

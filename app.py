@@ -11,6 +11,7 @@ from firebase_admin import credentials, firestore
 
 from config import Config
 from ai_service import analyze_crop_disease
+from treatment_db import init_treatment_db, get_treatment_guidance
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "crop-disease-secret-key")
@@ -80,6 +81,7 @@ def save_prediction(filename, result):
 
 
 init_db()
+init_treatment_db()
 
 
 # -----------------------------
@@ -369,9 +371,13 @@ def predict():
         result = analyze_crop_disease(filepath)
         save_prediction(filename, result)
 
+        # Retrieve treatment guidance from database
+        treatment_info = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))
+
         return jsonify({
             "success": True,
-            "result": result
+            "result": result,
+            "treatment_guidance": treatment_info
         })
 
     except Exception as e:

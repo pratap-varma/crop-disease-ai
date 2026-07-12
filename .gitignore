@@ -6,3 +6,10 @@ uploads/
 .vercel
 .env*
 serviceAccountKey.json
+node_modules/
+package.json
+package-lock.json
+*.png
+*.jpg
+*.jpeg
+*.log

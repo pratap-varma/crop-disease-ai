@@ -400,3 +400,197 @@ iframe.goog-te-banner-frame,
     border-color: #16a34a !important;
     box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
 }
+
+/* ===========================
+   Glassmorphism Styles
+   =========================== */
+.glass-card {
+    background: rgba(255, 255, 255, 0.65) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    box-shadow: 0 8px 32px 0 rgba(22, 163, 74, 0.05);
+}
+
+.glass-card-warning {
+    background: rgba(254, 242, 242, 0.65) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(239, 68, 68, 0.15) !important;
+    box-shadow: 0 8px 32px 0 rgba(239, 68, 68, 0.05);
+}
+
+.glass-card-info {
+    background: rgba(239, 246, 255, 0.65) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(59, 130, 246, 0.15) !important;
+    box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.05);
+}
+
+.glass-card-organic {
+    background: rgba(240, 253, 244, 0.65) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(34, 197, 94, 0.15) !important;
+    box-shadow: 0 8px 32px 0 rgba(34, 197, 94, 0.05);
+}
+
+.pulse-active {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.4);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.7);
+    }
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 10px rgba(22, 163, 74, 0);
+    }
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(22, 163, 74, 0);
+    }
+}
+
+/* =================================================
+   Mobile-First Style Overrides (max-width: 767px)
+   ================================================= */
+@media (max-width: 767px) {
+    /* Main Layout Spacings & Margins */
+    .py-24, .py-20, .py-16 {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+    }
+    .px-8, .px-12 {
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    .px-6 {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    
+    /* Layout grid transitions to vertical stacks */
+    .grid, .grid-cols-2, .grid-cols-3, .grid-cols-4, .lg\:grid-cols-2, .md\:grid-cols-2, .md\:grid-cols-3 {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+
+    /* Cards - refine border-radius, shadows, and paddings */
+    .card, .glass-card, .bg-white.rounded-3xl, .bg-white.p-8, .p-8 {
+        border-radius: 1.25rem !important; /* rounded-2xl */
+        padding: 1.5rem 1rem !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.03) !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+    
+    /* Buttons & Input elements dimensions */
+    input[type="text"], input[type="email"], input[type="password"], select, textarea {
+        min-height: 48px !important;
+        font-size: 16px !important; /* Prevents auto-zoom on iOS */
+        padding: 0.75rem 1rem !important;
+        border-radius: 0.75rem !important;
+        width: 100% !important;
+    }
+    
+    button, .btn, a[class*="bg-green-"], a[class*="bg-white"], input[type="submit"] {
+        min-height: 48px !important;
+        font-size: 0.95rem !important;
+        border-radius: 0.75rem !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 0.75rem 1.5rem !important;
+        touch-action: manipulation;
+    }
+
+    /* Tap feedback */
+    button:active, .btn:active, a[class*="bg-"]:active {
+        transform: scale(0.97) !important;
+        transition: transform 0.1s ease !important;
+    }
+
+    /* Hamburger mobile Menu slide down drawer style */
+    #mobileMenu {
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease-out;
+        display: block !important; /* overrides hidden default state */
+    }
+
+    #mobileMenu.show {
+        max-height: 600px;
+        opacity: 1;
+        padding-bottom: 1rem !important;
+    }
+    
+    /* Typography scaling down */
+    .text-6xl {
+        font-size: 2.25rem !important;
+        line-height: 2.75rem !important;
+    }
+    
+    .text-5xl {
+        font-size: 1.85rem !important;
+        line-height: 2.25rem !important;
+    }
+    
+    .text-4xl {
+        font-size: 1.5rem !important;
+        line-height: 1.95rem !important;
+    }
+    
+    .text-3xl {
+        font-size: 1.25rem !important;
+        line-height: 1.65rem !important;
+    }
+    
+    .text-xl {
+        font-size: 1rem !important;
+        line-height: 1.5rem !important;
+    }
+
+    /* Upload & drag box */
+    #dropArea {
+        padding: 2rem 1rem !important;
+        margin: 0.5rem 0 !important;
+        border-radius: 1.25rem !important;
+    }
+    
+    #previewImage {
+        max-height: 280px !important;
+        width: 100% !important;
+        object-fit: cover !important;
+        border-width: 4px !important;
+        border-radius: 1rem !important;
+    }
+}
+
+/* Animations */
+@keyframes bounce-down {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(8px); }
+}
+.bounce-indicator {
+    animation: bounce-down 2s infinite;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+.fade-in-card {
+    animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
