@@ -27,7 +27,10 @@ class Config:
 
     # SMTP Settings for Contact Form
     SMTP_SERVER = os.getenv("SMTP_SERVER", "").strip()
-    SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+    try:
+        SMTP_PORT = int(os.getenv("SMTP_PORT", "587").strip() or "587")
+    except ValueError:
+        SMTP_PORT = 587
     SMTP_USERNAME = os.getenv("SMTP_USERNAME", "").strip()
     SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "").strip()
     RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "").strip()

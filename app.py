@@ -51,12 +51,21 @@ else:
         except ValueError:
             pass
 
-db = firestore.client()
+def get_db():
+    try:
+        return firestore.client()
+    except Exception as e:
+        print(f"Error: Failed to initialize firestore client: {e}")
+        return None
 
 
 def init_db():
     try:
-        users_ref = db.collection("users")
+        client = get_db()
+        if client is None:
+            print("Warning: Firestore client is not initialized.")
+            return
+        users_ref = client.collection("users")
         admin_doc = users_ref.document("admin").get()
         if not admin_doc.exists:
             users_ref.document("admin").set({
@@ -71,7 +80,11 @@ def init_db():
 
 def save_prediction(filename, result):
     try:
-        db.collection("predictions").add({
+        client = get_db()
+        if client is None:
+            print("Warning: Firestore client is not initialized. Cannot save prediction.")
+            return
+        client.collection("predictions").add({
             "filename": filename,
             "result_json": json.dumps(result),
             "created_at": datetime.utcnow().isoformat()
@@ -176,7 +189,10 @@ def contact():
 
         # 1. Save to Firestore database
         try:
-            db.collection("contact_messages").add({
+            client = get_db()
+            if client is None:
+                raise RuntimeError("Database client not available.")
+            client.collection("contact_messages").add({
                 "name": name,
                 "email": email,
                 "message": message,
@@ -204,7 +220,10 @@ def login():
         password = request.form.get("password", "").strip()
 
         try:
-            users_ref = db.collection("users")
+            client = get_db()
+            if client is None:
+                raise RuntimeError("Database client not available.")
+            users_ref = client.collection("users")
             user = None
             if "@" in username_or_email:
                 # 1. Try matching by email
@@ -248,7 +267,10 @@ def signup():
             return render_template("signup.html", error_message="Username, email and password are required.")
 
         try:
-            users_ref = db.collection("users")
+            client = get_db()
+            if client is None:
+                raise RuntimeError("Database client not available.")
+            users_ref = client.collection("users")
             
             # Check by username or email
             existing_username = users_ref.where("username", "==", username).get()
@@ -285,7 +307,10 @@ def logout():
 def profile():
     username = session.get("username")
     try:
-        doc = db.collection("users").document(username).get()
+        client = get_db()
+        if client is None:
+            raise RuntimeError("Database client not available.")
+        doc = client.collection("users").document(username).get()
         user = doc.to_dict() if doc.exists else None
     except Exception as e:
         print(f"Profile retrieval error: {e}")
@@ -297,7 +322,10 @@ def profile():
 @login_required
 def history():
     try:
-        predictions_ref = db.collection("predictions")
+        client = get_db()
+        if client is None:
+            raise RuntimeError("Database client not available.")
+        predictions_ref = client.collection("predictions")
         docs = predictions_ref.order_by("created_at", direction=firestore.Query.DESCENDING).get()
         
         history_items = []
@@ -320,7 +348,10 @@ def history():
 @login_required
 def delete_history(history_id):
     try:
-        db.collection("predictions").document(history_id).delete()
+        client = get_db()
+        if client is None:
+            raise RuntimeError("Database client not available.")
+        client.collection("predictions").document(history_id).delete()
     except Exception as e:
         print(f"Failed to delete prediction history: {e}")
 
