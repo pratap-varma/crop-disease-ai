@@ -1,11 +1,14 @@
 import json
 import os
 import uuid
+import base64
+import io
 from datetime import datetime
 from functools import wraps
 
 from flask import Flask, jsonify, redirect, render_template, request, session, url_for, send_from_directory
 from werkzeug.utils import secure_filename
+from PIL import Image
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -30,9 +33,40 @@ app.config["MAX_CONTENT_LENGTH"] = Config.MAX_CONTENT_LENGTH
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 
+def get_compressed_base64(filepath):
+    try:
+        with Image.open(filepath) as img:
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            img.thumbnail((300, 300))
+            buffered = io.BytesIO()
+            img.save(buffered, format="JPEG", quality=60)
+            return base64.b64encode(buffered.getvalue()).decode("utf-8")
+    except Exception as e:
+        print(f"Failed to compress image to base64: {e}")
+        return ""
+
+
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    local_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    if os.path.exists(local_path):
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    
+    try:
+        client = get_db()
+        if client is not None:
+            docs = client.collection("predictions").where("filename", "==", filename).limit(1).get()
+            if docs:
+                doc = docs[0].to_dict()
+                base64_str = doc.get("image_base64")
+                if base64_str:
+                    img_data = base64.b64decode(base64_str)
+                    return img_data, 200, {'Content-Type': 'image/jpeg'}
+    except Exception as e:
+        print(f"Failed to fetch image from firestore for {filename}: {e}")
+        
+    return "Image not found", 404
 
 # -----------------------------
 # Firebase Initialization
@@ -84,7 +118,7 @@ def init_db():
         print(f"Warning: Failed to seed admin user: {e}")
 
 
-def save_prediction(filename, result):
+def save_prediction(filename, result, image_base64=""):
     try:
         client = get_db()
         if client is None:
@@ -93,6 +127,7 @@ def save_prediction(filename, result):
         client.collection("predictions").add({
             "filename": filename,
             "result_json": json.dumps(result),
+            "image_base64": image_base64,
             "created_at": datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -342,6 +377,7 @@ def history():
             history_items.append({
                 "id": doc.id,
                 "filename": row["filename"],
+                "image_base64": row.get("image_base64", ""),
                 "result": result,
                 "treatment_guidance": treatment_guidance,
                 "created_at": row["created_at"],
@@ -434,7 +470,8 @@ def predict():
                 "message": result.get("additional_notes") or "The uploaded image is blurry, unclear, or improper. Please upload a clear, high-quality close-up of the crop leaf."
             }), 400
 
-        save_prediction(filename, result)
+        image_base64 = get_compressed_base64(filepath)
+        save_prediction(filename, result, image_base64)
 
         # Retrieve treatment guidance from database
         treatment_info = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))
