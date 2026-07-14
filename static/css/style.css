@@ -593,4 +593,35 @@ iframe.goog-te-banner-frame,
 }
 .fade-in-card {
     animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ===========================
+   Google Translate Styling
+   =========================== */
+.goog-te-banner-frame {
+    display: none !important;
+}
+body {
+    top: 0px !important;
+}
+.goog-logo-link,
+.goog-logo-link:link,
+.goog-logo-link:visited,
+.goog-logo-link:hover,
+.goog-logo-link:active {
+    display: none !important;
+}
+#goog-gt-tt,
+.goog-te-balloon-frame {
+    display: none !important;
+}
+.goog-text-highlight {
+    background-color: transparent !important;
+    box-shadow: none !important;
+}
+.goog-te-gadget {
+    color: transparent !important;
+}
+.goog-te-gadget img {
+    display: none !important;
 }
