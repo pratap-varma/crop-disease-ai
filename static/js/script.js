@@ -36,6 +36,10 @@ dropArea.addEventListener("click", () => {
     imageInput.click();
 });
 
+imageInput.addEventListener("click", (e) => {
+    e.stopPropagation();
+});
+
 // ===============================
 // Preview Image
 // ===============================
@@ -124,6 +128,9 @@ uploadForm.addEventListener("submit", async function(e){
 
         }
 
+        if (data.filename) {
+            data.result.filename = data.filename;
+        }
         displayResult(data.result, data.treatment_guidance);
 
     }
@@ -315,6 +322,8 @@ function displayResult(result, treatmentGuidance){
             // Show fallback, hide verified
             treatmentVerified.classList.add("hidden");
             treatmentFallback.classList.remove("hidden");
+            document.getElementById("govAdvisory").textContent = "";
+            document.getElementById("lastUpdated").textContent = "";
         }
     }
 
@@ -448,272 +457,83 @@ function toggleSpeech() {
 // PDF Export Feature
 // ===============================
 
-function generateReportPDF() {
+async function generateReportPDF() {
     if (!currentResult) return;
     
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF("p", "mm", "a4");
-    
-    let y = 15;
-    
-    // Header banner style
-    doc.setFillColor(21, 128, 61); // dark green
-    doc.rect(0, 0, 210, 25, "F");
-    
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.text("CROP DISEASE ANALYSIS & TREATMENT REPORT", 15, 16);
-    
-    y = 35;
-    
-    // Section 1: AI Findings
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(21, 128, 61);
-    doc.text("1. GENERAL INFORMATION & AI ANALYSIS", 15, y);
-    y += 4;
-    doc.setDrawColor(220, 252, 231);
-    doc.line(15, y, 195, y);
-    y += 8;
-    
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(31, 41, 55);
-    
-    doc.text(`Crop Name: ${currentResult.crop_name}`, 15, y);
-    y += 6;
-    doc.text(`Disease Name: ${currentResult.disease_name}`, 15, y);
-    y += 6;
-    doc.text(`Confidence Level: ${currentResult.confidence}`, 15, y);
-    y += 6;
-    doc.text(`Severity Level: ${currentResult.severity}`, 15, y);
-    y += 6;
-    
-    // Sub-text wraps
-    const fertText = doc.splitTextToSize(`Fertilizer Recommendation: ${currentResult.fertilizer_recommendation || "N/A"}`, 110);
-    doc.text(fertText, 15, y);
-    y += (fertText.length * 5) + 2;
-    
-    const waterText = doc.splitTextToSize(`Watering Advice: ${currentResult.watering_advice || "N/A"}`, 110);
-    doc.text(waterText, 15, y);
-    
-    // Add crop image next to details
-    const imgElement = document.getElementById("previewImage");
-    if (imgElement && imgElement.src && imgElement.src.startsWith("data:image")) {
-        try {
-            doc.addImage(imgElement.src, "JPEG", 135, 41, 60, 50);
-        } catch (err) {
-            console.error("Failed to add image to PDF", err);
-        }
-    }
-    
-    y = 110;
-    
-    // Section 2: Symptoms & Causes
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(21, 128, 61);
-    doc.text("2. SYMPTOMS & POSSIBLE CAUSES", 15, y);
-    y += 4;
-    doc.line(15, y, 195, y);
-    y += 8;
-    
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(220, 38, 38); // red-600
-    doc.text("Symptoms:", 15, y);
-    doc.setTextColor(202, 138, 4); // yellow-600
-    doc.text("Possible Causes:", 110, y);
-    y += 6;
-    
-    doc.setFont("Helvetica", "normal");
-    doc.setTextColor(31, 41, 55);
-    
-    const symps = currentResult.symptoms || [];
-    const causes = currentResult.possible_causes || [];
-    
-    let sympY = y;
-    symps.forEach(s => {
-        const lines = doc.splitTextToSize(`• ${s}`, 85);
-        doc.text(lines, 15, sympY);
-        sympY += (lines.length * 5);
-    });
-    
-    let causeY = y;
-    causes.forEach(c => {
-        const lines = doc.splitTextToSize(`• ${c}`, 85);
-        doc.text(lines, 110, causeY);
-        causeY += (lines.length * 5);
-    });
-    
-    y = Math.max(sympY, causeY) + 10;
-    
-    if (y > 230) {
-        doc.addPage();
-        y = 20;
-    }
-    
-    // Section 3: Verified Treatment
-    if (currentTreatment) {
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(21, 128, 61);
-        doc.text("3. VERIFIED TREATMENT GUIDANCE", 15, y);
-        y += 4;
-        doc.line(15, y, 195, y);
-        y += 8;
-        
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(22, 101, 52); // green-800
-        doc.text("Organic Treatment Plan:", 15, y);
-        y += 6;
-        
-        doc.setFont("Helvetica", "normal");
-        doc.setTextColor(31, 41, 55);
-        (currentTreatment.organic_treatment || []).forEach((step, idx) => {
-            const lines = doc.splitTextToSize(`Step ${idx + 1}: ${step}`, 180);
-            doc.text(lines, 15, y);
-            y += (lines.length * 5);
-        });
-        y += 2;
-        
-        const altText = doc.splitTextToSize(`Organic Alternatives: ${currentTreatment.alternative_organic_solutions || "N/A"}`, 180);
-        doc.text(altText, 15, y);
-        y += (altText.length * 5) + 6;
-        
-        if (y > 230) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        doc.setFont("Helvetica", "bold");
-        doc.setTextColor(31, 41, 55);
-        doc.text("Chemical & Medicine Treatment details:", 15, y);
-        y += 6;
-        
-        doc.setFont("Helvetica", "normal");
-        doc.text(`• Medicine Name: ${currentTreatment.chemical_treatment_name}`, 15, y);
-        y += 5;
-        doc.text(`• Active Ingredient: ${currentTreatment.active_ingredient}`, 15, y);
-        y += 5;
-        doc.text(`• Brand Examples: ${currentTreatment.example_brand_names}`, 15, y);
-        y += 5;
-        doc.text(`• Application Method: ${currentTreatment.application_method}`, 15, y);
-        y += 8;
-        
-        if (y > 220) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        const landSize = document.getElementById("landSizeInput").value;
-        const landUnit = document.getElementById("landUnitSelect").value;
-        const totalMed = document.getElementById("mixingMedicine").textContent;
-        const totalWater = document.getElementById("mixingWater").textContent;
-        const tanksCount = document.getElementById("tanksCount").textContent;
-        const perTankDosage = document.getElementById("perTankDosage").textContent;
-        const tankCapacity = document.getElementById("sprayerCapacityInput").value;
+    const pdfBtn = document.getElementById("pdfBtn");
+    const originalContent = pdfBtn.innerHTML;
+    pdfBtn.disabled = true;
+    pdfBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <span>Generating PDF...</span>`;
 
-        doc.setFont("Helvetica", "bold");
-        doc.text("Mixing & Application Guidelines (Field Plan):", 15, y);
-        y += 6;
-        doc.setFont("Helvetica", "normal");
-        doc.text(`• Land Area Coverage: ${landSize} ${landUnit.charAt(0).toUpperCase() + landUnit.slice(1)}`, 15, y);
-        y += 5;
-        doc.text(`• Total Field Water: ${totalWater} | Total Field Medicine: ${totalMed}`, 15, y);
-        y += 5;
-        doc.text(`• Spray Equipment: ${tanksCount} (Capacity: ${tankCapacity} L)`, 15, y);
-        y += 5;
-        doc.text(`• Per-Tank Mix Dosage: Mix ${perTankDosage} of medicine per tank run.`, 15, y);
-        y += 8;
-        
-        doc.setFont("Helvetica", "bold");
-        doc.text("Mixing Steps (Per Tank Run):", 15, y);
-        y += 6;
-        doc.setFont("Helvetica", "normal");
-        
-        const baseDosage = parseDosage(currentTreatment.mixing_quantity);
-        (currentTreatment.mixing_steps || []).forEach((step, idx) => {
-            let stepText = step;
-            if (baseDosage) {
-                const perTankVal = tankCapacity * (baseDosage.val / 15);
-                const perTankValStr = (Math.round(perTankVal * 10) / 10) + " " + baseDosage.unit;
-                const regex = new RegExp(`\\b${baseDosage.val}\\s*${baseDosage.unit}\\b`, 'gi');
-                stepText = step.replace(regex, perTankValStr);
-            }
-            const lines = doc.splitTextToSize(`${idx + 1}. ${stepText}`, 175);
-            doc.text(lines, 18, y);
-            y += (lines.length * 5);
-        });
-        y += 6;
-        
-        if (y > 230) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        doc.setFont("Helvetica", "bold");
-        doc.text("Spray Schedule & Safety:", 15, y);
-        y += 6;
-        doc.setFont("Helvetica", "normal");
-        doc.text(`• Best Time: ${currentTreatment.spray_timing}`, 15, y);
-        y += 5;
-        doc.text(`• Repeat Interval: Repeat after ${currentTreatment.spray_interval} (Max ${currentTreatment.number_of_applications} applications)`, 15, y);
-        y += 5;
-        doc.text(`• PPE Required: ${currentTreatment.ppe_required}`, 15, y);
-        y += 5;
-        doc.text(`• Harvest Waiting Period: ${currentTreatment.waiting_period_before_harvest}`, 15, y);
-        y += 8;
-        
-        if (y > 240) {
-            doc.addPage();
-            y = 20;
-        }
-        
-        doc.setFont("Helvetica", "bold");
-        doc.text("Expected Recovery Timeline:", 15, y);
-        y += 6;
-        doc.setFont("Helvetica", "normal");
-        doc.text("• Day 1: Treatment Applied -> Day 3: Symptoms Reduce -> Day 7: Disease Controlled -> Day 14: Healthy New Growth", 15, y);
-        y += 8;
-        
-        const costMed = document.getElementById("costMedicine").textContent;
-        const costLab = document.getElementById("costLabour").textContent;
-        const costTot = document.getElementById("costTotal").textContent;
-
-        doc.setFont("Helvetica", "bold");
-        doc.text("Estimated Cost breakdown (For Entire Field):", 15, y);
-        y += 6;
-        doc.setFont("Helvetica", "normal");
-        doc.text(`• Medicine Cost: ${costMed} | Labour Cost: ${costLab} | Total Field Cost: ${costTot}`, 15, y);
-        y += 10;
-        
-        doc.setFont("Helvetica", "italic");
-        doc.setFontSize(8);
-        doc.setTextColor(156, 163, 175);
-        doc.text(`Source: ${currentTreatment.government_advisory_source} | Last Updated: ${currentTreatment.last_updated_date}`, 15, y);
-        
-    } else {
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(21, 128, 61);
-        doc.text("3. VERIFIED TREATMENT GUIDANCE", 15, y);
-        y += 4;
-        doc.line(15, y, 195, y);
-        y += 8;
-        
-        doc.setFont("Helvetica", "italic");
-        doc.setFontSize(10);
-        doc.setTextColor(107, 114, 128);
-        doc.text("No verified treatment guidance is currently stored in the local database for this disease.", 15, y);
+    // Extract sprayer calculator variables if available
+    let calculatorMetrics = null;
+    const landSizeInput = document.getElementById("landSizeInput");
+    if (landSizeInput) {
+        calculatorMetrics = {
+            land_size: landSizeInput.value,
+            land_unit: document.getElementById("landUnitSelect").value,
+            total_medicine: document.getElementById("mixingMedicine").textContent,
+            total_water: document.getElementById("mixingWater").textContent,
+            tanks_count: document.getElementById("tanksCount").textContent,
+            per_tank_dosage: document.getElementById("perTankDosage").textContent,
+            tank_capacity: document.getElementById("sprayerCapacityInput").value,
+            cost_medicine: document.getElementById("costMedicine").textContent,
+            cost_labour: document.getElementById("costLabour").textContent,
+            cost_total: document.getElementById("costTotal").textContent
+        };
     }
-    
-    // Save report file
-    const safeCrop = currentResult.crop_name.toLowerCase().replace(/\s+/g, '_');
-    const safeDisease = currentResult.disease_name.toLowerCase().replace(/\s+/g, '_');
-    doc.save(`report_${safeCrop}_${safeDisease}.pdf`);
+
+    const payload = {
+        crop_name: currentResult.crop_name,
+        disease_name: currentResult.disease_name,
+        confidence: currentResult.confidence,
+        severity: currentResult.severity,
+        symptoms: currentResult.symptoms,
+        possible_causes: currentResult.possible_causes,
+        prevention: currentResult.prevention,
+        treatment: currentResult.treatment,
+        fertilizer_recommendation: currentResult.fertilizer_recommendation,
+        watering_advice: currentResult.watering_advice,
+        additional_notes: currentResult.additional_notes,
+        filename: currentResult.filename || "",
+        treatment_guidance: currentTreatment || null,
+        calculator_metrics: calculatorMetrics
+    };
+
+    try {
+        const response = await fetch("/generate-pdf", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to generate PDF");
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        
+        const cleanCrop = (currentResult.crop_name || "Crop").replace(/\s+/g, "");
+        const cleanDisease = (currentResult.disease_name || "Disease").replace(/\s+/g, "");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        a.download = `${cleanCrop}_${cleanDisease}_${dateStr}.pdf`;
+        
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        alert("Error generating PDF: " + error.message);
+    } finally {
+        pdfBtn.disabled = false;
+        pdfBtn.innerHTML = originalContent;
+    }
 }
 
 // ===============================
@@ -849,4 +669,4 @@ function parseDosage(dosageStr) {
         return { val: parseFloat(match[1]), unit: match[2] };
     }
     return null;
-}
+}

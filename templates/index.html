@@ -42,6 +42,9 @@
                 <li><a href="/contact" class="hover:text-green-700">Contact</a></li>
 
                 {% if session.get('logged_in') %}
+                {% if session.get('username') == 'admin' %}
+                <li><a href="/admin/treatments" class="hover:text-green-700">Admin</a></li>
+                {% endif %}
                 <li>
                     <a href="/profile" class="text-green-700 font-bold">
                         {{ session.get('username')[0] | upper }}
@@ -65,6 +68,9 @@
             <li><a href="/contact">📞 Contact</a></li>
 
             {% if session.get('logged_in') %}
+            {% if session.get('username') == 'admin' %}
+            <li><a href="/admin/treatments">⚙️ Admin Panel</a></li>
+            {% endif %}
             <li><a href="/profile">👤 Profile</a></li>
             <li><a href="/logout" class="text-red-600">🚪 Logout</a></li>
             {% else %}

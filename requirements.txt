@@ -6,3 +6,4 @@ markdown==3.7
 requests
 google-generativeai==0.8.6
 firebase-admin
+reportlab

@@ -81,7 +81,8 @@ class MockFirestore:
         self.data = {
             "users": {},
             "predictions": {},
-            "contact_messages": {}
+            "contact_messages": {},
+            "treatments": {}
         }
 
     def collection(self, name):
@@ -105,11 +106,13 @@ class AppRoutesTests(unittest.TestCase):
         self.mock_db.data = {
             "users": {},
             "predictions": {},
-            "contact_messages": {}
+            "contact_messages": {},
+            "treatments": {}
         }
         # Re-initialize the app's db and seed default admin user
         app_module.db = self.mock_db
         app_module.init_db()
+        app_module.init_treatment_db()
 
         self.client = app_module.app.test_client()
         with self.client.session_transaction() as session:
@@ -174,6 +177,43 @@ class AppRoutesTests(unittest.TestCase):
 
         remaining = len(self.mock_db.data["predictions"])
         self.assertEqual(remaining, 0)
+
+    def test_uploaded_file_serves_image(self):
+        import shutil
+        os.makedirs(app_module.app.config["UPLOAD_FOLDER"], exist_ok=True)
+        test_filepath = os.path.join(app_module.app.config["UPLOAD_FOLDER"], "test_serve.jpg")
+        with open(test_filepath, "wb") as f:
+            f.write(b"dummy image data")
+
+        try:
+            response = self.client.get("/uploads/test_serve.jpg")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.data, b"dummy image data")
+            response.close()
+        finally:
+            if os.path.exists(test_filepath):
+                os.remove(test_filepath)
+
+    def test_history_page_loads_with_predictions(self):
+        app_module.save_prediction(
+            "sample_predict.jpg",
+            {
+                "crop_name": "Tomato",
+                "disease_name": "Late Blight",
+                "confidence": "High",
+                "severity": "Moderate",
+                "additional_notes": "Test prediction details",
+            },
+        )
+        
+        with self.client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+            
+        response = self.client.get("/history")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Tomato", response.data)
+        self.assertIn(b"Late Blight", response.data)
 
     def test_profile_route_requires_login(self):
         response = self.client.get("/profile", follow_redirects=False)
@@ -347,6 +387,56 @@ class AppRoutesTests(unittest.TestCase):
             self.assertTrue(data["success"])
             self.assertIsNotNone(data["treatment_guidance"])
             self.assertEqual(data["treatment_guidance"]["chemical_treatment_name"], "Mancozeb 75% WP")
+
+    def test_generate_pdf_route(self):
+        payload = {
+            "crop_name": "Tomato",
+            "disease_name": "Late Blight",
+            "confidence": "High",
+            "severity": "Moderate",
+            "symptoms": ["Dark brown spots"],
+            "possible_causes": ["High humidity"],
+            "prevention": ["Crop rotation"],
+            "treatment": ["Fungicide"],
+            "fertilizer_recommendation": "NPK",
+            "watering_advice": "Drip irrigation",
+            "additional_notes": "None"
+        }
+        response = self.client.post(
+            "/generate-pdf",
+            data=json.dumps(payload),
+            content_type="application/json"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, "application/pdf")
+        self.assertTrue(len(response.data) > 0)
+
+    @patch("app.analyze_crop_disease")
+    def test_predict_route_rejects_blurry_image(self, mock_analyze):
+        mock_analyze.return_value = {
+            "is_clear": False,
+            "crop_name": "Unknown",
+            "disease_name": "Improper Image",
+            "confidence": "Low",
+            "severity": "Unknown",
+            "symptoms": [],
+            "possible_causes": [],
+            "prevention": [],
+            "treatment": [],
+            "fertilizer_recommendation": "",
+            "watering_advice": "",
+            "additional_notes": "The uploaded image is blurry. Please upload a clear image."
+        }
+        import io
+        response = self.client.post(
+            "/predict",
+            data={"image": (io.BytesIO(b"dummy image data"), "blurry.jpg")},
+            content_type="multipart/form-data"
+        )
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data.decode("utf-8"))
+        self.assertFalse(data["success"])
+        self.assertIn("blurry", data["message"].lower())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Treatment Control Center | CropDiseaseAI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-lime-100 font-sans">
+    
+    <!-- Navbar -->
+    <nav class="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto flex justify-between items-center px-6 py-4">
+            <a href="/" class="text-3xl font-bold text-green-700 flex items-center gap-2">🌱 CropDiseaseAI <span class="bg-red-100 text-red-700 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wider">Admin</span></a>
+            <div class="space-x-6 font-semibold text-gray-700 flex items-center">
+                <a href="/" class="hover:text-green-700">Home</a>
+                <a href="/detect" class="hover:text-green-700">Detect</a>
+                <a href="/history" class="hover:text-green-700">History</a>
+                <a href="/logout" class="text-red-600 hover:text-red-700"><i class="fas fa-sign-out-alt"></i> Sign Out</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        
+        <!-- Welcome banner / Metrics -->
+        <div class="bg-white rounded-3xl p-6 shadow-xl border border-gray-100 mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Treatment Control Center</h1>
+                <p class="text-gray-500 mt-1">Manage normalized crop-disease guidance records, verify labels, and import datasets.</p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="openModal('add')" class="bg-green-700 hover:bg-green-800 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg transition">
+                    <i class="fas fa-plus"></i> Add Treatment
+                </button>
+                <button onclick="openImportModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg transition">
+                    <i class="fas fa-file-import"></i> Import Data
+                </button>
+                <div class="dropdown inline-block relative">
+                    <button class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-2xl flex items-center gap-2 shadow-md transition">
+                        <i class="fas fa-file-export"></i> Export <i class="fas fa-chevron-down text-xs"></i>
+                    </button>
+                    <ul class="dropdown-menu absolute hidden text-gray-700 pt-1 w-32 bg-white rounded-xl shadow-2xl border border-gray-100 z-50">
+                        <li><a class="hover:bg-gray-100 py-2 px-4 block whitespace-no-wrap rounded-t-xl" href="/admin/treatments/export/csv">CSV Format</a></li>
+                        <li><a class="hover:bg-gray-100 py-2 px-4 block whitespace-no-wrap rounded-b-xl" href="/admin/treatments/export/json">JSON Format</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="bg-white rounded-2xl p-6 shadow-md border border-gray-100 mb-6 flex flex-col md:flex-row gap-4">
+            <div class="flex-grow relative">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input type="text" id="searchInput" oninput="filterTable()" placeholder="Search by crop, disease, ingredient, active substance..." class="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500">
+            </div>
+            <div class="w-full md:w-48">
+                <select id="cropFilter" onchange="filterTable()" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                    <option value="">All Crops</option>
+                    {% set crops = [] %}
+                    {% for t in treatments %}
+                        {% if t.crop_name not in crops %}
+                            {% set _ = crops.append(t.crop_name) %}
+                            <option value="{{ t.crop_name }}">{{ t.crop_name }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="w-full md:w-48">
+                <select id="verifyFilter" onchange="filterTable()" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                    <option value="">All Statuses</option>
+                    <option value="verified">Verified Records</option>
+                    <option value="unverified">Unverified Records</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Listings Grid/Table -->
+        <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse text-left text-sm text-gray-500">
+                    <thead class="bg-gray-50 text-xs uppercase text-gray-700 font-bold border-b border-gray-100">
+                        <tr>
+                            <th scope="col" class="px-6 py-4">ID</th>
+                            <th scope="col" class="px-6 py-4">Crop</th>
+                            <th scope="col" class="px-6 py-4">Disease / Type</th>
+                            <th scope="col" class="px-6 py-4">Chemical Product / Ingredient</th>
+                            <th scope="col" class="px-6 py-4">Verification</th>
+                            <th scope="col" class="px-6 py-4 font-medium">Last Updated</th>
+                            <th scope="col" class="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="treatmentsTableBody" class="divide-y divide-gray-100">
+                        {% for t in treatments %}
+                        <tr class="hover:bg-gray-50/50 transition-colors duration-200" 
+                            data-crop="{{ t.crop_name }}" 
+                            data-disease="{{ t.disease_name }}"
+                            data-ingredient="{{ t.active_ingredient }}"
+                            data-chemical="{{ t.chemical_treatment_name }}"
+                            data-verified="{{ 'verified' if t.verified == 1 else 'unverified' }}">
+                            <td class="px-6 py-4 font-semibold text-gray-700">#{{ t.id }}</td>
+                            <td class="px-6 py-4 font-bold text-gray-900">{{ t.crop_name }}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-semibold text-gray-800">{{ t.disease_name }}</div>
+                                <div class="text-xs text-gray-400 font-medium">{{ t.disease_type }}</div>
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if t.chemical_treatment_name %}
+                                <div class="font-semibold text-green-700">{{ t.chemical_treatment_name }}</div>
+                                <div class="text-xs text-gray-400 truncate max-w-xs">{{ t.active_ingredient }}</div>
+                                {% else %}
+                                <span class="text-gray-400 italic text-xs">Organic Only</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                <form action="/admin/treatments/toggle-verify/{{ t.id }}" method="POST" class="inline">
+                                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition {{ 'bg-green-100 text-green-700 hover:bg-green-200' if t.verified == 1 else 'bg-amber-100 text-amber-700 hover:bg-amber-200' }}">
+                                        <span class="h-1.5 w-1.5 rounded-full {{ 'bg-green-600' if t.verified == 1 else 'bg-amber-500' }}"></span>
+                                        {{ 'Verified Label' if t.verified == 1 else 'Pending Review' }}
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="px-6 py-4 font-medium text-gray-400">{{ t.last_updated_date }}</td>
+                            <td class="px-6 py-4 text-right">
+                                <div class="flex justify-end gap-3">
+                                    <button onclick="editRecord(this)" data-record="{{ t | tojson | forceescape }}" class="text-gray-400 hover:text-green-700 text-base transition" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form action="/admin/treatments/delete/{{ t.id }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this record?');" class="inline">
+                                        <button type="submit" class="text-gray-400 hover:text-red-600 text-base transition" title="Delete">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- CRUD Add/Edit Modal -->
+    <div id="crudModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 transform scale-95 transition-transform duration-300 p-8">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
+                <h2 id="modalTitle" class="text-2xl font-bold text-gray-800">Add New Treatment</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl focus:outline-none">&times;</button>
+            </div>
+            
+            <!-- Tabs Menu -->
+            <div class="flex border-b border-gray-100 mb-6 gap-6 font-semibold">
+                <button onclick="switchTab('basic')" id="tabBtn-basic" class="tab-btn pb-3 text-green-700 border-b-2 border-green-700 focus:outline-none">Basic Info</button>
+                <button onclick="switchTab('chemical')" id="tabBtn-chemical" class="tab-btn pb-3 text-gray-400 border-b-2 border-transparent hover:text-gray-700 focus:outline-none">Chemical & Dosage</button>
+                <button onclick="switchTab('application')" id="tabBtn-application" class="tab-btn pb-3 text-gray-400 border-b-2 border-transparent hover:text-gray-700 focus:outline-none">Application & Safety</button>
+            </div>
+
+            <form action="/admin/treatments/save" method="POST" id="crudForm">
+                <input type="hidden" name="id" id="field-id">
+
+                <!-- Tab 1: Basic Info -->
+                <div id="tab-basic" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Crop Name *</label>
+                            <input type="text" name="crop_name" id="field-crop_name" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Disease Name *</label>
+                            <input type="text" name="disease_name" id="field-disease_name" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Disease Type *</label>
+                            <select name="disease_type" id="field-disease_type" required class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                                <option value="Fungal">Fungal</option>
+                                <option value="Bacterial">Bacterial</option>
+                                <option value="Viral">Viral</option>
+                                <option value="Insect Pest">Insect Pest</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Region/Country</label>
+                            <input type="text" name="country" id="field-country" value="India" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">State or Province</label>
+                            <input type="text" name="state_or_region" id="field-state_or_region" value="All" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Immediate / Cultural Actions (One per line)</label>
+                        <textarea name="organic_treatment" id="field-organic_treatment" rows="4" placeholder="e.g. Remove heavily infected leaves&#10;Improve air ventilation" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500 font-mono text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Organic Alternative Solution Description</label>
+                        <input type="text" name="alternative_organic_solutions" id="field-alternative_organic_solutions" placeholder="e.g. Spray Neem oil or compost tea" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                    </div>
+
+                    <div class="flex gap-6 mt-4">
+                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-gray-700">
+                            <input type="checkbox" name="verified" value="1" id="field-verified" checked class="w-5 h-5 accent-green-600 rounded"> Verify Record Status
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-gray-700">
+                            <input type="checkbox" name="disabled" value="1" id="field-disabled" class="w-5 h-5 accent-red-600 rounded"> Disable Record
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Chemical & Dosage -->
+                <div id="tab-chemical" class="tab-content space-y-6 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Chemical Product Name</label>
+                            <input type="text" name="chemical_treatment_name" id="field-chemical_treatment_name" placeholder="e.g. Mancozeb 75% WP" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Active Ingredient</label>
+                            <input type="text" name="active_ingredient" id="field-active_ingredient" placeholder="e.g. Mancozeb" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Purpose / Mode of Action</label>
+                            <input type="text" name="purpose" id="field-purpose" placeholder="e.g. Fungal cell membrane disruption" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Alternative Brand Names</label>
+                            <input type="text" name="example_brand_names" id="field-example_brand_names" placeholder="e.g. Dithane M-45, Indofil" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Mixing Dosage (e.g. 30 g)</label>
+                            <input type="text" name="mixing_quantity" id="field-mixing_quantity" placeholder="e.g. 30 g" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Water Vol (e.g. 15 Litres)</label>
+                            <input type="text" name="water_quantity" id="field-water_quantity" placeholder="e.g. 15 Litres" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Tank Size (e.g. 15 L)</label>
+                            <input type="text" name="spray_tank_size" id="field-spray_tank_size" placeholder="e.g. 15 L" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Mixing Instructions (One step per line)</label>
+                        <textarea name="mixing_steps" id="field-mixing_steps" rows="4" placeholder="e.g. Fill tank halfway with clean water.&#10;Add 30g product.&#10;Mix well." class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500 font-mono text-sm"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Est. Medicine Cost (₹)</label>
+                            <input type="number" step="0.01" name="cost_estimate_medicine" id="field-cost_estimate_medicine" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Est. Labour Cost (₹)</label>
+                            <input type="number" step="0.01" name="cost_estimate_labour" id="field-cost_estimate_labour" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Total Est. Cost (₹)</label>
+                            <input type="number" step="0.01" name="cost_estimate_total" id="field-cost_estimate_total" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Application & Safety -->
+                <div id="tab-application" class="tab-content space-y-6 hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Application Method</label>
+                            <input type="text" name="application_method" id="field-application_method" value="Foliar Spray" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Spray Timing</label>
+                            <input type="text" name="spray_timing" id="field-spray_timing" placeholder="e.g. Morning or Evening" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Repeat Interval</label>
+                            <input type="text" name="spray_interval" id="field-spray_interval" placeholder="e.g. 7 Days" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Required PPE</label>
+                            <input type="text" name="ppe_required" id="field-ppe_required" placeholder="e.g. Mask, Gloves, Long sleeves" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Pre-Harvest Waiting Period</label>
+                            <input type="text" name="waiting_period_before_harvest" id="field-waiting_period_before_harvest" placeholder="e.g. 14 Days" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Advisory Source / Reference</label>
+                            <input type="text" name="government_advisory_source" id="field-government_advisory_source" placeholder="e.g. ICAR Advisory No. 2024" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-2">Max Applications</label>
+                            <input type="number" name="number_of_applications" id="field-number_of_applications" value="3" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Application Locations (One per line)</label>
+                        <textarea name="where_to_spray" id="field-where_to_spray" rows="3" placeholder="e.g. Upper surface of leaves&#10;Lower surface of leaves" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500 font-mono text-sm"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Precautions & Safety instructions (One per line)</label>
+                        <textarea name="precautions" id="field-precautions" rows="4" placeholder="e.g. Avoid spraying before rainfall.&#10;Keep away from water sources." class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-green-500 font-mono text-sm"></textarea>
+                    </div>
+                </div>
+
+                <!-- Footer Buttons -->
+                <div class="flex justify-end gap-4 border-t border-gray-100 pt-6 mt-8">
+                    <button type="button" onclick="closeModal()" class="px-6 py-3 border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition">Cancel</button>
+                    <button type="submit" class="px-6 py-3 bg-green-700 hover:bg-green-800 text-white rounded-2xl shadow-lg transition">Save Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl w-full max-w-xl shadow-2xl border border-gray-100 p-8 transform scale-95 transition-transform duration-300">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-4 mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Import Datasets</h2>
+                <button onclick="closeImportModal()" class="text-gray-400 hover:text-gray-600 text-2xl focus:outline-none">&times;</button>
+            </div>
+            
+            <form id="importForm" class="space-y-6">
+                <div id="importDropzone" class="border-2 border-dashed border-gray-300 rounded-3xl p-8 text-center hover:border-green-500 hover:bg-green-50/50 transition cursor-pointer relative">
+                    <input type="file" id="importFile" accept=".csv,.json" required class="absolute inset-0 opacity-0 cursor-pointer">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                    <p class="font-semibold text-gray-700">Drag & Drop CSV or JSON files</p>
+                    <p class="text-xs text-gray-400 mt-1">Files will be validated, duplicates detected, and synonyms normalized</p>
+                </div>
+                
+                <div id="importProgress" class="hidden">
+                    <div class="flex justify-between items-center text-sm font-semibold mb-2">
+                        <span class="text-green-700" id="progressStatus">Uploading...</span>
+                        <span class="text-gray-400" id="progressPercent">0%</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-2">
+                        <div class="bg-green-600 h-2 rounded-full transition-all duration-300" id="progressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <div id="importSummary" class="hidden bg-gray-50 rounded-2xl p-4 text-sm space-y-2 border border-gray-200">
+                    <p class="font-bold text-gray-800">Import Result Summary</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>Success: <span id="summarySuccess" class="font-bold text-green-700">0</span></div>
+                        <div>Duplicates: <span id="summaryDuplicates" class="font-bold text-amber-600">0</span></div>
+                    </div>
+                    <div id="importErrorsContainer" class="hidden">
+                        <p class="font-bold text-red-600 mt-2">Error Details:</p>
+                        <ul id="importErrorsList" class="list-disc pl-4 text-xs text-red-600 max-h-32 overflow-y-auto space-y-1 mt-1"></ul>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-4">
+                    <button type="button" onclick="closeImportModal()" class="px-6 py-3 border border-gray-200 text-gray-700 rounded-2xl hover:bg-gray-50 transition">Close</button>
+                    <button type="submit" id="importSubmitBtn" class="px-6 py-3 bg-green-700 hover:bg-green-800 text-white rounded-2xl shadow-lg transition">Start Import</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script handlers -->
+    <script>
+        // Modal management
+        const crudModal = document.getElementById('crudModal');
+        const importModal = document.getElementById('importModal');
+        let currentTab = 'basic';
+
+        function openModal(mode) {
+            crudModal.classList.remove('hidden');
+            setTimeout(() => {
+                crudModal.classList.remove('opacity-0');
+                crudModal.firstElementChild.classList.remove('scale-95');
+            }, 10);
+            
+            if (mode === 'add') {
+                document.getElementById('modalTitle').textContent = 'Add New Treatment';
+                document.getElementById('crudForm').reset();
+                document.getElementById('field-id').value = '';
+                switchTab('basic');
+            }
+        }
+
+        function closeModal() {
+            crudModal.classList.add('opacity-0');
+            crudModal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                crudModal.classList.add('hidden');
+            }, 300);
+        }
+
+        function openImportModal() {
+            importModal.classList.remove('hidden');
+            document.getElementById('importSummary').classList.add('hidden');
+            document.getElementById('importProgress').classList.add('hidden');
+            document.getElementById('importForm').reset();
+            setTimeout(() => {
+                importModal.classList.remove('opacity-0');
+                importModal.firstElementChild.classList.remove('scale-95');
+            }, 10);
+        }
+
+        // Dropdown menu toggle
+        document.querySelector('.dropdown').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.querySelector('.dropdown-menu').classList.toggle('hidden');
+        });
+        window.addEventListener('click', function() {
+            document.querySelector('.dropdown-menu').classList.add('hidden');
+        });
+
+        function closeImportModal() {
+            importModal.classList.add('opacity-0');
+            importModal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => {
+                importModal.classList.add('hidden');
+                if (!document.getElementById('importSummary').classList.contains('hidden')) {
+                    window.location.reload();
+                }
+            }, 300);
+        }
+
+        // Tabs
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-green-700', 'border-green-700');
+                btn.classList.add('text-gray-400', 'border-transparent');
+            });
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+
+            document.getElementById(`tabBtn-${tabId}`).classList.add('text-green-700', 'border-green-700');
+            document.getElementById(`tabBtn-${tabId}`).classList.remove('text-gray-400', 'border-transparent');
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            currentTab = tabId;
+        }
+
+        // Search and filter table rows
+        function filterTable() {
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            const cropFilter = document.getElementById('cropFilter').value;
+            const verifyFilter = document.getElementById('verifyFilter').value;
+            
+            const rows = document.querySelectorAll('#treatmentsTableBody tr');
+            rows.forEach(row => {
+                const crop = row.dataset.crop;
+                const disease = row.dataset.disease;
+                const ingredient = row.dataset.ingredient.toLowerCase();
+                const chemical = row.dataset.chemical.toLowerCase();
+                const verified = row.dataset.verified;
+
+                const textMatch = crop.toLowerCase().includes(searchQuery) || 
+                                  disease.toLowerCase().includes(searchQuery) || 
+                                  ingredient.includes(searchQuery) || 
+                                  chemical.includes(searchQuery);
+
+                const cropMatch = !cropFilter || crop === cropFilter;
+                const verifyMatch = !verifyFilter || verified === verifyFilter;
+
+                if (textMatch && cropMatch && verifyMatch) {
+                    row.classList.remove('hidden');
+                } else {
+                    row.classList.add('hidden');
+                }
+            });
+        }
+
+        // Edit button data hydrate
+        function editRecord(btn) {
+            const raw = btn.getAttribute('data-record');
+            const data = JSON.parse(raw);
+            
+            // Hydrate simple text fields
+            document.getElementById('field-id').value = data.id || '';
+            document.getElementById('field-crop_name').value = data.crop_name || '';
+            document.getElementById('field-disease_name').value = data.disease_name || '';
+            document.getElementById('field-disease_type').value = data.disease_type || 'Fungal';
+            document.getElementById('field-country').value = data.country || 'India';
+            document.getElementById('field-state_or_region').value = data.state_or_region || 'All';
+            document.getElementById('field-alternative_organic_solutions').value = data.alternative_organic_solutions || '';
+            
+            document.getElementById('field-chemical_treatment_name').value = data.chemical_treatment_name || '';
+            document.getElementById('field-active_ingredient').value = data.active_ingredient || '';
+            document.getElementById('field-purpose').value = data.purpose || '';
+            document.getElementById('field-example_brand_names').value = data.example_brand_names || '';
+            document.getElementById('field-mixing_quantity').value = data.mixing_quantity || '';
+            document.getElementById('field-water_quantity').value = data.water_quantity || '';
+            document.getElementById('field-spray_tank_size').value = data.spray_tank_size || '';
+            
+            document.getElementById('field-cost_estimate_medicine').value = data.cost_estimate_medicine || 0;
+            document.getElementById('field-cost_estimate_labour').value = data.cost_estimate_labour || 0;
+            document.getElementById('field-cost_estimate_total').value = data.cost_estimate_total || 0;
+            
+            document.getElementById('field-application_method').value = data.application_method || 'Foliar Spray';
+            document.getElementById('field-spray_timing').value = data.spray_timing || '';
+            document.getElementById('field-spray_interval').value = data.spray_interval || '';
+            document.getElementById('field-number_of_applications').value = data.number_of_applications || 3;
+            document.getElementById('field-ppe_required').value = data.ppe_required || '';
+            document.getElementById('field-waiting_period_before_harvest').value = data.waiting_period_before_harvest || '';
+            document.getElementById('field-government_advisory_source').value = data.government_advisory_source || '';
+
+            // Checkboxes
+            document.getElementById('field-verified').checked = data.verified === 1;
+            document.getElementById('field-disabled').checked = data.disabled === 1;
+
+            // Multi-line list fields
+            document.getElementById('field-organic_treatment').value = (data.organic_treatment || []).join('\n');
+            document.getElementById('field-mixing_steps').value = (data.mixing_steps || []).join('\n');
+            document.getElementById('field-where_to_spray').value = (data.where_to_spray || []).join('\n');
+            document.getElementById('field-precautions').value = (data.precautions || []).join('\n');
+
+            document.getElementById('modalTitle').textContent = 'Edit Treatment Record';
+            
+            openModal('edit');
+        }
+
+        // CSV/JSON Data import Ajax submission
+        document.getElementById('importForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('importFile');
+            if (fileInput.files.length === 0) return;
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            const progressSection = document.getElementById('importProgress');
+            const summarySection = document.getElementById('importSummary');
+            const submitBtn = document.getElementById('importSubmitBtn');
+            
+            progressSection.classList.remove('hidden');
+            summarySection.classList.add('hidden');
+            submitBtn.disabled = true;
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/admin/treatments/import', true);
+            
+            xhr.upload.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    const percent = Math.round((event.loaded / event.total) * 100);
+                    document.getElementById('progressBar').style.width = percent + '%';
+                    document.getElementById('progressPercent').textContent = percent + '%';
+                }
+            };
+            
+            xhr.onload = function() {
+                submitBtn.disabled = false;
+                progressSection.classList.add('hidden');
+                
+                if (xhr.status === 200) {
+                    const res = JSON.parse(xhr.responseText);
+                    summarySection.classList.remove('hidden');
+                    document.getElementById('summarySuccess').textContent = res.success_count;
+                    document.getElementById('summaryDuplicates').textContent = res.duplicate_count;
+                    
+                    const errorsContainer = document.getElementById('importErrorsContainer');
+                    const errorsList = document.getElementById('importErrorsList');
+                    errorsList.innerHTML = '';
+                    
+                    if (res.errors && res.errors.length > 0) {
+                        errorsContainer.classList.remove('hidden');
+                        res.errors.forEach(err => {
+                            const li = document.createElement('li');
+                            li.textContent = err;
+                            errorsList.appendChild(li);
+                        });
+                    } else {
+                        errorsContainer.classList.add('hidden');
+                    }
+                } else {
+                    alert('Import failed: ' + xhr.responseText);
+                }
+            };
+            
+            xhr.onerror = function() {
+                submitBtn.disabled = false;
+                progressSection.classList.add('hidden');
+                alert('An error occurred during upload.');
+            };
+            
+            xhr.send(formData);
+        });
+
+        // Dropzone decoration
+        const dropzone = document.getElementById('importDropzone');
+        const fileInput = document.getElementById('importFile');
+        
+        fileInput.addEventListener('change', function() {
+            if (fileInput.files.length > 0) {
+                dropzone.querySelector('p.font-semibold').textContent = fileInput.files[0].name;
+                dropzone.classList.add('border-green-500', 'bg-green-50/50');
+            }
+        });
+    </script>
+</body>
+</html>
