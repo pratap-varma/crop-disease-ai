@@ -534,8 +534,8 @@ const historyData = {
         "{{ item.id }}": {
             "id": "{{ item.id }}",
             "filename": "{{ item.filename }}",
-            "result": {{ item.result | tojson }},
-            "treatment_guidance": {{ item.treatment_guidance | tojson if item.treatment_guidance else 'null' }},
+            "result": {{ item.result | tojson | safe }},
+            "treatment_guidance": {{ item.treatment_guidance | tojson | safe if item.treatment_guidance else 'null' }},
             "created_at": "{{ item.created_at }}"
         },
     {% endfor %}
