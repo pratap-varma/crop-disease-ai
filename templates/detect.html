@@ -176,6 +176,25 @@
                     <img id="previewImage" class="hidden mx-auto rounded-3xl shadow-lg max-h-80 w-full object-cover">
                 </div>
 
+                <!-- Treatment Preference Selection (Hidden initially, shown after image upload) -->
+                <div id="treatmentPreferenceContainer" class="hidden mt-8 max-w-md mx-auto px-4">
+                    <p class="text-gray-500 font-semibold text-xs uppercase tracking-wider text-center mb-3">Preferred Treatment Path</p>
+                    <div class="flex gap-4">
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="treatment_preference" value="organic" class="sr-only peer" checked>
+                            <div class="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-100 text-center font-bold text-gray-500 hover:bg-gray-50 peer-checked:border-green-600 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                🌿 Organic
+                            </div>
+                        </label>
+                        <label class="flex-1 cursor-pointer">
+                            <input type="radio" name="treatment_preference" value="pesticides" class="sr-only peer">
+                            <div class="flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-gray-100 text-center font-bold text-gray-500 hover:bg-gray-50 peer-checked:border-green-600 peer-checked:bg-green-50 peer-checked:text-green-700 transition">
+                                🧪 Pesticides
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
                 <!-- Analyze Button -->
                 <div class="text-center mt-8 px-2">
                     <button type="submit" id="analyzeBtn"
@@ -343,7 +362,7 @@
             <div id="treatmentVerified" class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                 <!-- 1. Organic Treatment -->
-                <div class="glass-card-organic rounded-3xl p-8 shadow-md">
+                <div id="organicCard" class="glass-card-organic rounded-3xl p-8 shadow-md">
                     <h3
                         class="text-2xl font-bold text-green-800 mb-6 flex items-center border-b pb-3 border-green-200/50">
                         <span class="mr-2">🌱</span> Organic Treatment
@@ -358,7 +377,7 @@
                 </div>
 
                 <!-- 2. Chemical Treatment -->
-                <div class="glass-card rounded-3xl p-8 shadow-md">
+                <div id="chemicalCard" class="glass-card rounded-3xl p-8 shadow-md">
                     <h3
                         class="text-2xl font-bold text-gray-800 mb-6 flex items-center border-b pb-3 border-gray-200/30">
                         <span class="mr-2">💊</span> Chemical Treatment
@@ -388,7 +407,7 @@
                 </div>
 
                 <!-- 3. Mixing Guide -->
-                <div class="glass-card rounded-3xl p-8 shadow-md md:col-span-2">
+                <div id="mixingGuideCard" class="glass-card rounded-3xl p-8 shadow-md md:col-span-2">
                     <h3
                         class="text-2xl font-bold text-gray-800 mb-6 flex items-center border-b pb-3 border-gray-200/30">
                         <span class="mr-2">🧪</span> Mixing Guide

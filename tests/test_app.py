@@ -438,6 +438,36 @@ class AppRoutesTests(unittest.TestCase):
         self.assertFalse(data["success"])
         self.assertIn("blurry", data["message"].lower())
 
+    @patch("app.analyze_crop_disease")
+    def test_predict_route_handles_treatment_preference(self, mock_analyze):
+        mock_analyze.return_value = {
+            "crop_name": "Tomato",
+            "disease_name": "Late Blight",
+            "confidence": "High",
+            "severity": "Moderate",
+            "symptoms": ["Dark brown spots"],
+            "possible_causes": ["High humidity"],
+            "prevention": ["Crop rotation"],
+            "treatment": ["Fungicide"],
+            "fertilizer_recommendation": "NPK",
+            "watering_advice": "Drip irrigation",
+            "additional_notes": "None"
+        }
+
+        with patch("app.save_prediction") as mock_save:
+            import io
+            response = self.client.post(
+                "/predict",
+                data={
+                    "image": (io.BytesIO(b"dummy image data"), "test.jpg"),
+                    "treatment_preference": "pesticides"
+                },
+                content_type="multipart/form-data"
+            )
+            self.assertEqual(response.status_code, 200)
+            mock_analyze.assert_called_once_with(unittest.mock.ANY, "pesticides")
+            mock_save.assert_called_once_with(unittest.mock.ANY, mock_analyze.return_value, unittest.mock.ANY, "pesticides")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -118,7 +118,7 @@ def init_db():
         print(f"Warning: Failed to seed admin user: {e}")
 
 
-def save_prediction(filename, result, image_base64=""):
+def save_prediction(filename, result, image_base64="", treatment_preference="organic"):
     try:
         client = get_db()
         if client is None:
@@ -128,6 +128,7 @@ def save_prediction(filename, result, image_base64=""):
             "filename": filename,
             "result_json": json.dumps(result),
             "image_base64": image_base64,
+            "treatment_preference": treatment_preference,
             "created_at": datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -378,6 +379,7 @@ def history():
                 "id": doc.id,
                 "filename": row["filename"],
                 "image_base64": row.get("image_base64", ""),
+                "treatment_preference": row.get("treatment_preference", "organic"),
                 "result": result,
                 "treatment_guidance": treatment_guidance,
                 "created_at": row["created_at"],
@@ -457,8 +459,11 @@ def predict():
         # Save uploaded image
         file.save(filepath)
 
+        # Extract treatment preference
+        treatment_preference = request.form.get("treatment_preference", "organic")
+
         # Analyze using Gemini
-        result = analyze_crop_disease(filepath)
+        result = analyze_crop_disease(filepath, treatment_preference)
 
         # Validate image clarity and plant presence
         if not result.get("is_clear", True):
@@ -471,7 +476,7 @@ def predict():
             }), 400
 
         image_base64 = get_compressed_base64(filepath)
-        save_prediction(filename, result, image_base64)
+        save_prediction(filename, result, image_base64, treatment_preference)
 
         # Retrieve treatment guidance from database
         treatment_info = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))

@@ -64,6 +64,10 @@ function showPreview(file){
 
         previewImage.classList.remove("hidden");
 
+        const prefContainer = document.getElementById("treatmentPreferenceContainer");
+        if (prefContainer) {
+            prefContainer.classList.remove("hidden");
+        }
     }
 
     reader.readAsDataURL(file);
@@ -105,6 +109,9 @@ uploadForm.addEventListener("submit", async function(e){
     const formData=new FormData();
 
     formData.append("image",imageInput.files[0]);
+
+    const preference = document.querySelector('input[name="treatment_preference"]:checked')?.value || "organic";
+    formData.append("treatment_preference", preference);
 
     try{
 
@@ -193,9 +200,33 @@ function displayResult(result, treatmentGuidance){
         treatmentSection.classList.remove("hidden");
 
         if (treatmentGuidance) {
-            // Show verified, hide fallback
             treatmentVerified.classList.remove("hidden");
             treatmentFallback.classList.add("hidden");
+
+            // Toggle visibility based on chosen preference
+            const preference = document.querySelector('input[name="treatment_preference"]:checked')?.value || "organic";
+            const organicCard = document.getElementById("organicCard");
+            const chemicalCard = document.getElementById("chemicalCard");
+            const mixingGuideCard = document.getElementById("mixingGuideCard");
+
+            if (preference === "organic") {
+                if (organicCard) {
+                    organicCard.classList.remove("hidden");
+                    organicCard.className = "glass-card-organic rounded-3xl p-8 shadow-md md:col-span-2";
+                }
+                if (chemicalCard) chemicalCard.classList.add("hidden");
+                if (mixingGuideCard) mixingGuideCard.classList.add("hidden");
+            } else {
+                if (organicCard) organicCard.classList.add("hidden");
+                if (chemicalCard) {
+                    chemicalCard.classList.remove("hidden");
+                    chemicalCard.className = "glass-card rounded-3xl p-8 shadow-md md:col-span-2";
+                }
+                if (mixingGuideCard) {
+                    mixingGuideCard.classList.remove("hidden");
+                    mixingGuideCard.className = "glass-card rounded-3xl p-8 shadow-md md:col-span-2";
+                }
+            }
 
             // 1. Organic Treatment
             const organicSteps = document.getElementById("organicSteps");

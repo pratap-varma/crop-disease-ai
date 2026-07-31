@@ -16,20 +16,21 @@ def _get_api_key():
     return api_key
 
 
-def analyze_crop_disease(image_path):
+def analyze_crop_disease(image_path, treatment_preference="organic"):
     """Analyze crop image using Gemini AI."""
 
     api_key = _get_api_key()
     genai.configure(api_key=api_key)
 
-    prompt = """
+    prompt = f"""
 You are an expert agricultural scientist.
 
 Analyze the uploaded crop image carefully.
+The user prefers {treatment_preference.upper()} treatments. Make sure that the suggested "treatment" list and advice focus on and prioritize {treatment_preference} methods.
 
 Return ONLY valid JSON.
 
-{
+{{
     "is_clear": true,
     "crop_name":"",
     "disease_name":"",
@@ -42,7 +43,7 @@ Return ONLY valid JSON.
     "fertilizer_recommendation":"",
     "watering_advice":"",
     "additional_notes":""
-}
+}}
 
 Rules:
 1. Return ONLY valid JSON.
