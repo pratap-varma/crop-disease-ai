@@ -80,7 +80,8 @@ Rules:
                     "mime_type": mime_type,
                     "data": image_bytes,
                 },
-            ]
+            ],
+            generation_config={"temperature": 0.1, "response_mime_type": "application/json"}
         )
 
         result_text = response.text.strip()
@@ -185,7 +186,10 @@ Rules:
             "gemini-2.5-flash",
             tools=[genai.protos.Tool(google_search={})]
         )
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0.1, "response_mime_type": "application/json"}
+        )
         result_text = response.text.strip()
         if result_text.startswith("```"):
             result_text = result_text.replace("```json", "").replace("```", "").strip()
