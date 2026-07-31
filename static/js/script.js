@@ -74,6 +74,41 @@ function showPreview(file){
 
 }
 
+// Live change listener to toggle treatment card visibility instantly
+document.addEventListener("DOMContentLoaded", () => {
+    const radios = document.querySelectorAll('input[name="treatment_preference"]');
+    radios.forEach(radio => {
+        radio.addEventListener("change", () => {
+            const resultSec = document.getElementById("resultSection");
+            if (resultSec && !resultSec.classList.contains("hidden")) {
+                const preference = radio.value;
+                const organicCard = document.getElementById("organicCard");
+                const chemicalCard = document.getElementById("chemicalCard");
+                const mixingGuideCard = document.getElementById("mixingGuideCard");
+
+                if (preference === "organic") {
+                    if (organicCard) {
+                        organicCard.classList.remove("hidden");
+                        organicCard.className = "glass-card-organic rounded-3xl p-8 shadow-md md:col-span-2";
+                    }
+                    if (chemicalCard) chemicalCard.classList.add("hidden");
+                    if (mixingGuideCard) mixingGuideCard.classList.add("hidden");
+                } else {
+                    if (organicCard) organicCard.classList.add("hidden");
+                    if (chemicalCard) {
+                        chemicalCard.classList.remove("hidden");
+                        chemicalCard.className = "glass-card rounded-3xl p-8 shadow-md md:col-span-2";
+                    }
+                    if (mixingGuideCard) {
+                        mixingGuideCard.classList.remove("hidden");
+                        mixingGuideCard.className = "glass-card rounded-3xl p-8 shadow-md md:col-span-2";
+                    }
+                }
+            }
+        });
+    });
+});
+
 // ===============================
 // Upload Image
 // ===============================
