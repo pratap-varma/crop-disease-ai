@@ -176,8 +176,9 @@ Return ONLY valid JSON with this exact structure:
 
 Rules:
 1. Return ONLY valid JSON.
-2. The mixing steps must contain 3-5 clear instructions.
-3. Every field must be populated with realistic, standard values.
+2. The treatment plan MUST tell completely to the user WHAT TO DO (exact remedies/medicines), HOW TO DO IT (dilution steps, mixing instructions, and application methods), and WHEN TO DO IT (best time of day, weather conditions, spray intervals, and application limits).
+3. The mixing steps must contain 3-5 clear instructions.
+4. Every field must be populated with realistic, standard values.
 """
     try:
         model = genai.GenerativeModel(
