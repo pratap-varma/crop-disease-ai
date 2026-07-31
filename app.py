@@ -376,21 +376,26 @@ def history():
             result = json.loads(row["result_json"])
             treatment_guidance = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))
             pref = row.get("treatment_preference", "organic")
-            if treatment_guidance and pref == "organic":
-                treatment_guidance = dict(treatment_guidance)
-                treatment_guidance["chemical_treatment_name"] = ""
-                treatment_guidance["active_ingredient"] = ""
-                treatment_guidance["purpose"] = ""
-                treatment_guidance["example_brand_names"] = ""
-                treatment_guidance["mixing_quantity"] = ""
-                treatment_guidance["water_quantity"] = ""
-                treatment_guidance["spray_tank_size"] = ""
-                treatment_guidance["mixing_steps"] = []
-                treatment_guidance["precautions"] = []
-                treatment_guidance["ppe_required"] = ""
-                treatment_guidance["waiting_period_before_harvest"] = ""
-                treatment_guidance["cost_estimate_medicine"] = 0.0
-                treatment_guidance["cost_estimate_total"] = treatment_guidance.get("cost_estimate_labour", 0.0)
+            if treatment_guidance:
+                if pref == "organic":
+                    treatment_guidance = dict(treatment_guidance)
+                    treatment_guidance["chemical_treatment_name"] = ""
+                    treatment_guidance["active_ingredient"] = ""
+                    treatment_guidance["purpose"] = ""
+                    treatment_guidance["example_brand_names"] = ""
+                    treatment_guidance["mixing_quantity"] = ""
+                    treatment_guidance["water_quantity"] = ""
+                    treatment_guidance["spray_tank_size"] = ""
+                    treatment_guidance["mixing_steps"] = []
+                    treatment_guidance["precautions"] = []
+                    treatment_guidance["ppe_required"] = ""
+                    treatment_guidance["waiting_period_before_harvest"] = ""
+                    treatment_guidance["cost_estimate_medicine"] = 0.0
+                    treatment_guidance["cost_estimate_total"] = treatment_guidance.get("cost_estimate_labour", 0.0)
+                elif pref == "pesticides":
+                    treatment_guidance = dict(treatment_guidance)
+                    treatment_guidance["organic_treatment"] = []
+                    treatment_guidance["alternative_organic_solutions"] = ""
 
             history_items.append({
                 "id": doc.id,
@@ -508,21 +513,26 @@ def predict():
             except Exception as ge:
                 print(f"Failed to auto-generate treatment record on prediction: {ge}")
 
-        if treatment_info and treatment_preference == "organic":
-            treatment_info = dict(treatment_info)
-            treatment_info["chemical_treatment_name"] = ""
-            treatment_info["active_ingredient"] = ""
-            treatment_info["purpose"] = ""
-            treatment_info["example_brand_names"] = ""
-            treatment_info["mixing_quantity"] = ""
-            treatment_info["water_quantity"] = ""
-            treatment_info["spray_tank_size"] = ""
-            treatment_info["mixing_steps"] = []
-            treatment_info["precautions"] = []
-            treatment_info["ppe_required"] = ""
-            treatment_info["waiting_period_before_harvest"] = ""
-            treatment_info["cost_estimate_medicine"] = 0.0
-            treatment_info["cost_estimate_total"] = treatment_info.get("cost_estimate_labour", 0.0)
+        if treatment_info:
+            if treatment_preference == "organic":
+                treatment_info = dict(treatment_info)
+                treatment_info["chemical_treatment_name"] = ""
+                treatment_info["active_ingredient"] = ""
+                treatment_info["purpose"] = ""
+                treatment_info["example_brand_names"] = ""
+                treatment_info["mixing_quantity"] = ""
+                treatment_info["water_quantity"] = ""
+                treatment_info["spray_tank_size"] = ""
+                treatment_info["mixing_steps"] = []
+                treatment_info["precautions"] = []
+                treatment_info["ppe_required"] = ""
+                treatment_info["waiting_period_before_harvest"] = ""
+                treatment_info["cost_estimate_medicine"] = 0.0
+                treatment_info["cost_estimate_total"] = treatment_info.get("cost_estimate_labour", 0.0)
+            elif treatment_preference == "pesticides":
+                treatment_info = dict(treatment_info)
+                treatment_info["organic_treatment"] = []
+                treatment_info["alternative_organic_solutions"] = ""
 
         return jsonify({
             "success": True,

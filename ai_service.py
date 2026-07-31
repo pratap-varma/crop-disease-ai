@@ -25,7 +25,7 @@ def analyze_crop_disease(image_path, treatment_preference="pesticides"):
     if treatment_preference == "organic":
         preference_instruction = "The user prefers ORGANIC treatments. The suggested 'treatment' list, advice, and recommendations MUST be 100% organic, biological, natural, and cultural. DO NOT suggest, name, or mention any synthetic chemicals, medicines, pesticides, fungicides, or commercial chemical sprays."
     else:
-        preference_instruction = "The user prefers PESTICIDE/CHEMICAL treatments. Make sure that the suggested 'treatment' list and advice include standard, effective chemical medicines, synthetic pesticides, fungicides, or herbicides along with active ingredients."
+        preference_instruction = "The user prefers PESTICIDE/CHEMICAL treatments. The suggested 'treatment' list, advice, and recommendations MUST focus completely on chemical pesticides, fungicides, active ingredients, and synthetic formulations. DO NOT suggest, name, or mention any organic solutions, home remedies, plant extracts (like neem oil), or natural cultural methods."
 
     prompt = f"""
 You are an expert agricultural scientist.
