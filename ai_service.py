@@ -16,17 +16,22 @@ def _get_api_key():
     return api_key
 
 
-def analyze_crop_disease(image_path, treatment_preference="organic"):
+def analyze_crop_disease(image_path, treatment_preference="pesticides"):
     """Analyze crop image using Gemini AI."""
 
     api_key = _get_api_key()
     genai.configure(api_key=api_key)
 
+    if treatment_preference == "organic":
+        preference_instruction = "The user prefers ORGANIC treatments. The suggested 'treatment' list, advice, and recommendations MUST be 100% organic, biological, natural, and cultural. DO NOT suggest, name, or mention any synthetic chemicals, medicines, pesticides, fungicides, or commercial chemical sprays."
+    else:
+        preference_instruction = "The user prefers PESTICIDE/CHEMICAL treatments. Make sure that the suggested 'treatment' list and advice include standard, effective chemical medicines, synthetic pesticides, fungicides, or herbicides along with active ingredients."
+
     prompt = f"""
 You are an expert agricultural scientist.
 
 Analyze the uploaded crop image carefully.
-The user prefers {treatment_preference.upper()} treatments. Make sure that the suggested "treatment" list and advice focus on and prioritize {treatment_preference} methods.
+{preference_instruction}
 
 Return ONLY valid JSON.
 
