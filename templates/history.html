@@ -183,24 +183,29 @@
 
 <!-- Report Modal Overlay -->
 <div id="reportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 overflow-y-auto flex items-center justify-center p-4">
-    <div class="bg-green-50 rounded-3xl max-w-6xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative border border-white/20">
-        <!-- Close Button -->
-        <button onclick="closeModal()" class="absolute right-6 top-6 text-4xl font-light text-gray-500 hover:text-red-600 focus:outline-none transition z-10">&times;</button>
+    <div class="bg-green-50 rounded-3xl max-w-6xl w-full max-h-[90vh] flex flex-col shadow-2xl relative border border-white/20 overflow-hidden">
+        <!-- Modal Header -->
+        <div class="flex justify-between items-center px-6 py-4 md:px-8 bg-green-50 border-b border-green-100/60 shrink-0">
+            <h2 class="text-xl md:text-2xl font-bold text-green-700">
+                Analysis Report Details
+            </h2>
+            <button onclick="closeModal()" class="w-11 h-11 flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-green-100/60 rounded-full focus:outline-none transition active:scale-95 text-3xl font-light" aria-label="Close modal">
+                &times;
+            </button>
+        </div>
         
-        <div class="p-6 md:p-10">
+        <!-- Modal Body -->
+        <div class="flex-grow overflow-y-auto p-6 md:p-10">
             <!-- Loading Skeleton/Spinner -->
-            <div id="modalLoading" class="hidden flex flex-col items-center justify-center py-20">
-                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-green-700 mb-4"></div>
-                <p class="text-green-800 font-semibold animate-pulse">Loading report details...</p>
+            <div id="modalLoading" class="hidden flex flex-col items-center justify-center min-h-[350px] gap-6">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-green-700"></div>
+                <p class="text-green-800 font-semibold animate-pulse text-lg">Loading report details...</p>
             </div>
             
             <div id="modalContent">
                 <!-- ================= RESULT CARD IN MODAL ================= -->
                 <section id="modal-resultSection" class="max-w-6xl mx-auto">
                 <div class="bg-transparent md:bg-white rounded-3xl p-0 md:p-8">
-                    <h2 class="text-3xl md:text-4xl font-bold text-center text-green-700 mb-6 md:mb-10">
-                        Analysis Report Details
-                    </h2>
                     
                     <div class="grid md:grid-cols-2 gap-6 md:gap-10">
                         <!-- Card 1: General Information -->
