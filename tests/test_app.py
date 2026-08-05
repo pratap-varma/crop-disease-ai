@@ -40,7 +40,24 @@ class MockQuery:
         return self.results
 
     def order_by(self, field, direction="ASCENDING"):
-        return self
+        reverse = (direction == "DESCENDING")
+        sorted_results = list(self.results)
+        sorted_results.sort(key=lambda x: x.to_dict().get(field, ""), reverse=reverse)
+        return MockQuery(sorted_results)
+
+    def limit(self, num):
+        return MockQuery(self.results[:num])
+
+    def offset(self, num):
+        return MockQuery(self.results[num:])
+
+    def select(self, fields):
+        filtered_results = []
+        for doc in self.results:
+            data = doc.to_dict()
+            filtered_data = {k: v for k, v in data.items() if k in fields}
+            filtered_results.append(MockDocument(doc.id, filtered_data))
+        return MockQuery(filtered_results)
 
 
 class MockCollection:
@@ -71,6 +88,20 @@ class MockCollection:
         reverse = (direction == "DESCENDING")
         results.sort(key=lambda x: x.to_dict().get(field, ""), reverse=reverse)
         return MockQuery(results)
+
+    def limit(self, num):
+        return MockQuery(self.get()[:num])
+
+    def offset(self, num):
+        return MockQuery(self.get()[num:])
+
+    def select(self, fields):
+        filtered_results = []
+        for doc in self.get():
+            data = doc.to_dict()
+            filtered_data = {k: v for k, v in data.items() if k in fields}
+            filtered_results.append(MockDocument(doc.id, filtered_data))
+        return MockQuery(filtered_results)
 
     def get(self):
         return [MockDocument(doc_id, doc_data) for doc_id, doc_data in self.db.data[self.name].items()]
@@ -467,6 +498,160 @@ class AppRoutesTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             mock_analyze.assert_called_once_with(unittest.mock.ANY, "pesticides")
             mock_save.assert_called_once_with(unittest.mock.ANY, mock_analyze.return_value, unittest.mock.ANY, "pesticides")
+
+    def test_api_history_returns_paginated_records(self):
+        app_module.save_prediction(
+            "sample1.jpg",
+            {
+                "crop_name": "Tomato",
+                "disease_name": "Late Blight",
+                "confidence": "High",
+                "severity": "Moderate",
+                "additional_notes": "Test1",
+            },
+        )
+        app_module.save_prediction(
+            "sample2.jpg",
+            {
+                "crop_name": "Potato",
+                "disease_name": "Early Blight",
+                "confidence": "Medium",
+                "severity": "Mild",
+                "additional_notes": "Test2",
+            },
+        )
+
+        # Manually assign distinct timestamps to ensure deterministic DESC ordering by created_at
+        keys = list(self.mock_db.data["predictions"].keys())
+        self.mock_db.data["predictions"][keys[0]]["created_at"] = "2026-08-05T12:00:00.000000"
+        self.mock_db.data["predictions"][keys[1]]["created_at"] = "2026-08-05T12:00:01.000000"
+
+        with self.client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+
+        # Check pagination with limit 1
+        response = self.client.get("/api/history?limit=1&offset=0")
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data.decode("utf-8"))
+        self.assertTrue(data["success"])
+        self.assertEqual(len(data["records"]), 1)
+        # Should be newest first (Potato early blight)
+        self.assertEqual(data["records"][0]["result"]["crop_name"], "Potato")
+        
+        # Check second page
+        response = self.client.get("/api/history?limit=1&offset=1")
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data.decode("utf-8"))
+        self.assertTrue(data["success"])
+        self.assertEqual(len(data["records"]), 1)
+        self.assertEqual(data["records"][0]["result"]["crop_name"], "Tomato")
+
+    def test_api_history_detail_returns_full_guidance(self):
+        app_module.save_prediction(
+            "sample_detail.jpg",
+            {
+                "crop_name": "Rice",
+                "disease_name": "Blast",
+                "confidence": "High",
+                "severity": "Severe",
+                "additional_notes": "Test Detail",
+                "symptoms": ["Lesions"],
+                "possible_causes": ["Fungus"],
+                "prevention": ["Water management"],
+                "treatment": ["Fungicide"]
+            },
+        )
+        
+        item_id = list(self.mock_db.data["predictions"].keys())[0]
+
+        with self.client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+
+        response = self.client.get(f"/api/history/{item_id}")
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data.decode("utf-8"))
+        
+        self.assertEqual(data["id"], item_id)
+        self.assertEqual(data["result"]["crop_name"], "Rice")
+        # Detailed fields should be present
+        self.assertIn("symptoms", data["result"])
+        # Should have treatment guidance looked up
+        self.assertIsNotNone(data["treatment_guidance"])
+        self.assertEqual(data["treatment_guidance"]["chemical_treatment_name"], "Tricyclazole 75% WP")
+
+    @patch("app.analyze_crop_disease")
+    def test_complete_integration_flow(self, mock_analyze):
+        # 1. Setup mock prediction analysis
+        mock_analyze.return_value = {
+            "crop_name": "Tomato",
+            "disease_name": "Early Blight",
+            "confidence": "High",
+            "severity": "Moderate",
+            "symptoms": ["Target spots"],
+            "possible_causes": ["Alternaria solani"],
+            "prevention": ["Mulch soil"],
+            "treatment": ["Copper spray"],
+            "fertilizer_recommendation": "Calcium",
+            "watering_advice": "Drip only",
+            "additional_notes": "Integration test note"
+        }
+
+        # 2. Login admin user
+        login_response = self.client.post(
+            "/login",
+            data={"username_or_email": "admin", "password": "crop123"},
+            follow_redirects=True
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+        # 3. Simulate image upload and disease detection
+        import io
+        predict_response = self.client.post(
+            "/predict",
+            data={
+                "image": (io.BytesIO(b"dummy image bytes"), "leaf.jpg"),
+                "treatment_preference": "organic"
+            },
+            content_type="multipart/form-data"
+        )
+        self.assertEqual(predict_response.status_code, 200)
+        predict_data = json.loads(predict_response.data.decode("utf-8"))
+        self.assertTrue(predict_data["success"])
+
+        # Find the saved prediction ID in mock database
+        keys = list(self.mock_db.data["predictions"].keys())
+        self.assertTrue(len(keys) > 0)
+        newest_id = keys[-1]
+
+        # 4. Check that the history page loads and contains the new record
+        history_response = self.client.get("/history")
+        self.assertEqual(history_response.status_code, 200)
+        self.assertIn(b"Tomato", history_response.data)
+        self.assertIn(b"Early Blight", history_response.data)
+
+        # 5. Check API history list has the new record
+        api_list_response = self.client.get("/api/history?limit=10&offset=0")
+        self.assertEqual(api_list_response.status_code, 200)
+        list_data = json.loads(api_list_response.data.decode("utf-8"))
+        self.assertTrue(list_data["success"])
+        self.assertEqual(list_data["records"][0]["id"], newest_id)
+        self.assertEqual(list_data["records"][0]["result"]["crop_name"], "Tomato")
+
+        # 6. Check API history details has treatment guidance
+        api_detail_response = self.client.get(f"/api/history/{newest_id}")
+        self.assertEqual(api_detail_response.status_code, 200)
+        detail_data = json.loads(api_detail_response.data.decode("utf-8"))
+        self.assertEqual(detail_data["id"], newest_id)
+        self.assertEqual(detail_data["result"]["crop_name"], "Tomato")
+        self.assertEqual(detail_data["result"]["disease_name"], "Early Blight")
+        self.assertEqual(detail_data["result"]["additional_notes"], "Integration test note")
+        
+        # Verify treatment guidance details are present and formatted for organic
+        self.assertIsNotNone(detail_data["treatment_guidance"])
+        self.assertIn("organic_treatment", detail_data["treatment_guidance"])
+        self.assertEqual(detail_data["treatment_guidance"]["chemical_treatment_name"], "")
 
 
 if __name__ == "__main__":

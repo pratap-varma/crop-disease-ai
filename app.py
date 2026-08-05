@@ -368,49 +368,149 @@ def history():
         if client is None:
             raise RuntimeError("Database client not available.")
         predictions_ref = client.collection("predictions")
-        docs = predictions_ref.order_by("created_at", direction=firestore.Query.DESCENDING).get()
+        docs = (
+            predictions_ref
+            .select(["filename", "result_json", "image_base64", "created_at", "treatment_preference"])
+            .order_by("created_at", direction=firestore.Query.DESCENDING)
+            .limit(10)
+            .get()
+        )
         
         history_items = []
         for doc in docs:
             row = doc.to_dict()
-            result = json.loads(row["result_json"])
-            treatment_guidance = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))
+            result = json.loads(row.get("result_json", "{}"))
             pref = row.get("treatment_preference", "organic")
-            if treatment_guidance:
-                if pref == "organic":
-                    treatment_guidance = dict(treatment_guidance)
-                    treatment_guidance["chemical_treatment_name"] = ""
-                    treatment_guidance["active_ingredient"] = ""
-                    treatment_guidance["purpose"] = ""
-                    treatment_guidance["example_brand_names"] = ""
-                    treatment_guidance["mixing_quantity"] = ""
-                    treatment_guidance["water_quantity"] = ""
-                    treatment_guidance["spray_tank_size"] = ""
-                    treatment_guidance["mixing_steps"] = []
-                    treatment_guidance["precautions"] = []
-                    treatment_guidance["ppe_required"] = ""
-                    treatment_guidance["waiting_period_before_harvest"] = ""
-                    treatment_guidance["cost_estimate_medicine"] = 0.0
-                    treatment_guidance["cost_estimate_total"] = treatment_guidance.get("cost_estimate_labour", 0.0)
-                elif pref == "pesticides":
-                    treatment_guidance = dict(treatment_guidance)
-                    treatment_guidance["organic_treatment"] = []
-                    treatment_guidance["alternative_organic_solutions"] = ""
-
+            
+            # Format minimal result for the list page
+            minimal_result = {
+                "crop_name": result.get("crop_name", "Unknown"),
+                "disease_name": result.get("disease_name", "Unknown"),
+                "confidence": result.get("confidence", "N/A"),
+                "severity": result.get("severity", "N/A"),
+                "additional_notes": result.get("additional_notes", "")
+            }
+            
             history_items.append({
                 "id": doc.id,
-                "filename": row["filename"],
+                "filename": row.get("filename", ""),
                 "image_base64": row.get("image_base64", ""),
                 "treatment_preference": pref,
-                "result": result,
-                "treatment_guidance": treatment_guidance,
-                "created_at": row["created_at"],
+                "result": minimal_result,
+                "created_at": row.get("created_at", ""),
             })
     except Exception as e:
         print(f"History retrieval error: {e}")
         history_items = []
 
     return render_template("history.html", history_items=history_items)
+
+
+@app.route("/api/history")
+@login_required
+def api_history():
+    try:
+        limit = request.args.get("limit", 10, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        
+        client = get_db()
+        if client is None:
+            return jsonify({"success": False, "message": "Database client not available"}), 500
+            
+        predictions_ref = client.collection("predictions")
+        docs = (
+            predictions_ref
+            .select(["filename", "result_json", "image_base64", "created_at", "treatment_preference"])
+            .order_by("created_at", direction=firestore.Query.DESCENDING)
+            .offset(offset)
+            .limit(limit)
+            .get()
+        )
+        
+        records = []
+        for doc in docs:
+            row = doc.to_dict()
+            result = json.loads(row.get("result_json", "{}"))
+            pref = row.get("treatment_preference", "organic")
+            
+            minimal_result = {
+                "crop_name": result.get("crop_name", "Unknown"),
+                "disease_name": result.get("disease_name", "Unknown"),
+                "confidence": result.get("confidence", "N/A"),
+                "severity": result.get("severity", "N/A"),
+                "additional_notes": result.get("additional_notes", "")
+            }
+            
+            records.append({
+                "id": doc.id,
+                "filename": row.get("filename", ""),
+                "image_base64": row.get("image_base64", ""),
+                "treatment_preference": pref,
+                "result": minimal_result,
+                "created_at": row.get("created_at", "")
+            })
+            
+        return jsonify({"success": True, "records": records})
+    except Exception as e:
+        print(f"API History error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/history/<string:history_id>")
+@login_required
+def api_history_detail(history_id):
+    try:
+        client = get_db()
+        if client is None:
+            return jsonify({"success": False, "message": "Database client not available"}), 500
+            
+        doc_ref = client.collection("predictions").document(history_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
+            return jsonify({"success": False, "message": "Record not found"}), 404
+            
+        row = doc.to_dict()
+        result = json.loads(row.get("result_json", "{}"))
+        
+        treatment_guidance = get_treatment_guidance(result.get("crop_name"), result.get("disease_name"))
+        pref = row.get("treatment_preference", "organic")
+        
+        if treatment_guidance:
+            if pref == "organic":
+                treatment_guidance = dict(treatment_guidance)
+                treatment_guidance["chemical_treatment_name"] = ""
+                treatment_guidance["active_ingredient"] = ""
+                treatment_guidance["purpose"] = ""
+                treatment_guidance["example_brand_names"] = ""
+                treatment_guidance["mixing_quantity"] = ""
+                treatment_guidance["water_quantity"] = ""
+                treatment_guidance["spray_tank_size"] = ""
+                treatment_guidance["mixing_steps"] = []
+                treatment_guidance["precautions"] = []
+                treatment_guidance["ppe_required"] = ""
+                treatment_guidance["waiting_period_before_harvest"] = ""
+                treatment_guidance["cost_estimate_medicine"] = 0.0
+                treatment_guidance["cost_estimate_total"] = treatment_guidance.get("cost_estimate_labour", 0.0)
+            elif pref == "pesticides":
+                treatment_guidance = dict(treatment_guidance)
+                treatment_guidance["organic_treatment"] = []
+                treatment_guidance["alternative_organic_solutions"] = ""
+                
+        record = {
+            "id": doc.id,
+            "filename": row.get("filename", ""),
+            "image_base64": row.get("image_base64", ""),
+            "treatment_preference": pref,
+            "result": result,
+            "treatment_guidance": treatment_guidance,
+            "created_at": row.get("created_at", "")
+        }
+        
+        return jsonify(record)
+    except Exception as e:
+        print(f"API History Detail error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/history/delete/<string:history_id>", methods=["POST"])

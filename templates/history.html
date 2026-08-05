@@ -96,7 +96,7 @@
     <div class="max-w-6xl mx-auto">
         <h1 class="text-4xl font-bold text-green-700 mb-6">Prediction History</h1>
         {% if history_items %}
-            <div class="space-y-6">
+            <div id="historyListContainer" class="space-y-6">
                 {% for item in history_items %}
                     <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 border border-gray-100 hover:shadow-xl transition duration-300">
                         <!-- Image thumbnail -->
@@ -139,8 +139,42 @@
                     </div>
                 {% endfor %}
             </div>
+            
+            <!-- Skeleton Container -->
+            <div id="skeletonContainer" class="hidden space-y-6 mt-6">
+                <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 border border-gray-100 animate-pulse">
+                    <div class="w-full md:w-48 h-48 bg-gray-200 rounded-xl flex-shrink-0"></div>
+                    <div class="flex-grow flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start mb-3">
+                                <div class="h-6 bg-gray-200 rounded-md w-1/3"></div>
+                                <div class="h-5 bg-gray-200 rounded-full w-24"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 mb-4">
+                                <div class="h-5 bg-gray-200 rounded-md w-1/2"></div>
+                                <div class="h-5 bg-gray-200 rounded-md w-1/2"></div>
+                            </div>
+                            <div class="h-4 bg-gray-200 rounded-md w-full mb-2"></div>
+                            <div class="h-4 bg-gray-200 rounded-md w-3/4"></div>
+                        </div>
+                        <div class="flex justify-between items-center mt-6">
+                            <div class="h-10 bg-gray-200 rounded-xl w-36"></div>
+                            <div class="h-10 bg-gray-200 rounded-lg w-20"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Load More Button -->
+            <div id="loadMoreContainer" class="flex justify-center mt-10 mb-6">
+                <button id="loadMoreBtn" onclick="loadMoreRecords()" class="bg-green-700 hover:bg-green-800 text-white px-8 py-3 rounded-xl font-bold shadow-md transition active:scale-95 flex items-center gap-2">
+                    <span>Load More</span>
+                    <i id="loadMoreIcon" class="fas fa-chevron-down"></i>
+                </button>
+            </div>
         {% else %}
-            <div class="bg-white rounded-2xl shadow p-8 text-center text-gray-600">
+            <div id="historyListContainer" class="space-y-6"></div>
+            <div class="bg-white rounded-2xl shadow p-8 text-center text-gray-600" id="emptyState">
                 No predictions saved yet.
             </div>
         {% endif %}
@@ -154,8 +188,15 @@
         <button onclick="closeModal()" class="absolute right-6 top-6 text-4xl font-light text-gray-500 hover:text-red-600 focus:outline-none transition z-10">&times;</button>
         
         <div class="p-6 md:p-10">
-            <!-- ================= RESULT CARD IN MODAL ================= -->
-            <section id="modal-resultSection" class="max-w-6xl mx-auto">
+            <!-- Loading Skeleton/Spinner -->
+            <div id="modalLoading" class="hidden flex flex-col items-center justify-center py-20">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-green-700 mb-4"></div>
+                <p class="text-green-800 font-semibold animate-pulse">Loading report details...</p>
+            </div>
+            
+            <div id="modalContent">
+                <!-- ================= RESULT CARD IN MODAL ================= -->
+                <section id="modal-resultSection" class="max-w-6xl mx-auto">
                 <div class="bg-transparent md:bg-white rounded-3xl p-0 md:p-8">
                     <h2 class="text-3xl md:text-4xl font-bold text-center text-green-700 mb-6 md:mb-10">
                         Analysis Report Details
@@ -523,19 +564,25 @@
                     </div>
                 </div>
             </section>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
-// Embedded history prediction data
+// Embedded history prediction data (minimal fields)
 const historyData = {
     {% for item in history_items %}
         "{{ item.id }}": {
             "id": "{{ item.id }}",
             "filename": "{{ item.filename }}",
-            "result": {{ item.result | tojson | safe }},
-            "treatment_guidance": {{ item.treatment_guidance | tojson | safe if item.treatment_guidance else 'null' }},
+            "result": {
+                "crop_name": {{ item.result.crop_name | tojson | safe }},
+                "disease_name": {{ item.result.disease_name | tojson | safe }},
+                "confidence": {{ item.result.confidence | tojson | safe }},
+                "severity": {{ item.result.severity | tojson | safe }},
+                "additional_notes": {{ item.result.additional_notes | tojson | safe }}
+            },
             "treatment_preference": "{{ item.treatment_preference or 'organic' }}",
             "created_at": "{{ item.created_at }}"
         },
@@ -568,22 +615,54 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
-function showReport(itemId) {
-    const item = historyData[itemId];
-    if (!item) return;
-    
-    currentModalItem = item;
-    
+function showModalLoading(isLoading) {
+    const loadingDiv = document.getElementById("modalLoading");
+    const contentDiv = document.getElementById("modalContent");
+    if (loadingDiv && contentDiv) {
+        if (isLoading) {
+            loadingDiv.classList.remove("hidden");
+            contentDiv.classList.add("hidden");
+        } else {
+            loadingDiv.classList.add("hidden");
+            contentDiv.classList.remove("hidden");
+        }
+    }
+}
+
+async function showReport(itemId) {
     // Stop any active text to speech
     if (window.speechSynthesis) {
         window.speechSynthesis.cancel();
     }
     resetModalSpeechButton();
     
-    // Show Modal
+    // Show Modal immediately in loading state
     const modal = document.getElementById("reportModal");
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden"; // disable background scrolling
+    
+    let item = historyData[itemId];
+    
+    // If details are not loaded yet, fetch them (check by availability of symptoms, which is detailed only)
+    if (!item || !item.result || !item.result.symptoms) {
+        showModalLoading(true);
+        try {
+            const response = await fetch(`/api/history/${itemId}`);
+            if (!response.ok) {
+                throw new Error("Failed to load details");
+            }
+            item = await response.json();
+            historyData[itemId] = item; // Cache the complete details
+        } catch (err) {
+            alert("Error loading report details: " + err.message);
+            closeModal();
+            return;
+        } finally {
+            showModalLoading(false);
+        }
+    }
+    
+    currentModalItem = item;
     
     // Populate simple fields
     document.getElementById("modal-cropName").textContent = item.result.crop_name;
@@ -1055,6 +1134,130 @@ async function generateModalReportPDF() {
     } finally {
         pdfBtn.disabled = false;
         pdfBtn.innerHTML = originalContent;
+    }
+}
+
+let currentOffset = 10;
+const limit = 10;
+let hasMore = {% if history_items|length >= 10 %}true{% else %}false{% endif %};
+let isLoadingMore = false;
+
+document.addEventListener("DOMContentLoaded", function() {
+    const container = document.getElementById("loadMoreContainer");
+    if (container && !hasMore) {
+        container.classList.add("hidden");
+    }
+});
+
+function createHistoryItemHTML(item) {
+    const severityLower = (item.result.severity || '').toLowerCase();
+    let severityClass = 'bg-green-100 text-green-800';
+    if (severityLower === 'high') {
+        severityClass = 'bg-red-100 text-red-800';
+    } else if (severityLower === 'medium') {
+        severityClass = 'bg-yellow-100 text-yellow-800';
+    }
+
+    const imageSrc = item.image_base64 
+        ? `data:image/jpeg;base64,${item.image_base64}` 
+        : `/uploads/${item.filename}`;
+
+    const cropName = item.result.crop_name || 'Unknown';
+    const diseaseName = item.result.disease_name || 'Unknown';
+    const confidence = item.result.confidence || 'N/A';
+    const severity = item.result.severity || 'N/A';
+    const additionalNotes = item.result.additional_notes || 'None';
+    const createdAt = item.created_at || '';
+    const deleteUrl = `/history/delete/${item.id}`;
+
+    return `
+        <div class="bg-white rounded-2xl shadow-lg p-6 flex flex-col md:flex-row gap-6 border border-gray-100 hover:shadow-xl transition duration-300">
+            <!-- Image thumbnail -->
+            <div class="w-full md:w-48 h-48 flex-shrink-0 relative group cursor-pointer" onclick="showReport('${item.id}')">
+                <img src="${imageSrc}" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;%2315803d&quot; stroke-width=&quot;1.5&quot; stroke-linecap=&quot;round&quot; stroke-linejoin=&quot;round&quot; style=&quot;background:%23f0fdf4;width:100%;height:100%;&quot;><path d=&quot;M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z&quot; fill=&quot;%2315803d&quot;/></svg>'" class="w-full h-full object-cover rounded-xl border border-gray-200 group-hover:scale-[1.02] transition-transform duration-300" alt="Uploaded leaf image">
+                <div class="absolute inset-0 bg-black/40 bg-opacity-0 group-hover:bg-opacity-40 transition-all duration-300 rounded-xl flex items-center justify-center">
+                    <span class="text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-sm flex items-center gap-1">
+                        <i class="fas fa-eye"></i> View Report
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Details -->
+            <div class="flex-grow flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <h2 class="text-xl font-bold text-green-700 cursor-pointer hover:underline" onclick="showReport('${item.id}')">
+                            ${cropName} - ${diseaseName}
+                        </h2>
+                        <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${createdAt}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-4">
+                        <p><strong>Confidence:</strong> <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-md font-semibold">${confidence}</span></p>
+                        <p><strong>Severity:</strong> <span class="px-2 py-0.5 ${severityClass} rounded-md font-semibold">${severity}</span></p>
+                    </div>
+                    <p class="text-gray-700 text-sm"><strong>Notes:</strong> ${additionalNotes}</p>
+                </div>
+                
+                <div class="flex justify-between items-center mt-6">
+                    <button onclick="showReport('${item.id}')" class="bg-green-700 hover:bg-green-800 text-white px-5 py-2 rounded-xl font-semibold shadow transition active:scale-95">
+                        View Full Report
+                    </button>
+                    <form action="${deleteUrl}" method="post" onsubmit="return confirm('Are you sure you want to delete this history item?');" class="m-0">
+                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow transition active:scale-95">
+                            Delete
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+async function loadMoreRecords() {
+    if (isLoadingMore || !hasMore) return;
+    
+    isLoadingMore = true;
+    const btn = document.getElementById("loadMoreBtn");
+    const icon = document.getElementById("loadMoreIcon");
+    const skeleton = document.getElementById("skeletonContainer");
+    
+    if (btn) btn.disabled = true;
+    if (icon) icon.className = "fas fa-spinner fa-spin";
+    if (skeleton) skeleton.classList.remove("hidden");
+    
+    try {
+        const response = await fetch(`/api/history?limit=${limit}&offset=${currentOffset}`);
+        if (!response.ok) {
+            throw new Error("Failed to load records");
+        }
+        
+        const data = await response.json();
+        const records = data.records || [];
+        
+        if (records.length < limit) {
+            hasMore = false;
+            const container = document.getElementById("loadMoreContainer");
+            if (container) container.classList.add("hidden");
+        }
+        
+        const listContainer = document.getElementById("historyListContainer");
+        records.forEach(item => {
+            // Save to cache with minimal fields first
+            historyData[item.id] = item;
+            
+            const tempDiv = document.createElement("div");
+            tempDiv.innerHTML = createHistoryItemHTML(item);
+            listContainer.appendChild(tempDiv.firstElementChild);
+        });
+        
+        currentOffset += records.length;
+    } catch (err) {
+        alert("Error loading more records: " + err.message);
+    } finally {
+        isLoadingMore = false;
+        if (btn) btn.disabled = false;
+        if (icon) icon.className = "fas fa-chevron-down";
+        if (skeleton) skeleton.classList.add("hidden");
     }
 }
 </script>

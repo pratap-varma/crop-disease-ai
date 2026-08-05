@@ -5,13 +5,7 @@ import sqlite3
 import os
 
 # Import the shared mock database to prevent test configuration leakage
-from tests.test_app import mock_db
-
-# Start patchers before importing app so globals resolve cleanly
-admin_patcher = patch("firebase_admin.initialize_app")
-client_patcher = patch("firebase_admin.firestore.client", return_value=mock_db)
-admin_patcher.start()
-client_patcher.start()
+from test_app import mock_db
 
 import app as app_module
 from treatment_db import (

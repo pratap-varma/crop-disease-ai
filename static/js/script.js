@@ -3,11 +3,21 @@
 // ===============================
 
 const uploadForm = document.getElementById("uploadForm");
-const imageInput = document.getElementById("imageInput");
+const cameraInput = document.getElementById("cameraInput");
+const galleryInput = document.getElementById("galleryInput");
 const previewImage = document.getElementById("previewImage");
+const previewActionsContainer = document.getElementById("previewActionsContainer");
+const retakeBtn = document.getElementById("retakeBtn");
+const changeImageBtn = document.getElementById("changeImageBtn");
+const captureBtn = document.getElementById("captureBtn");
+const galleryBtn = document.getElementById("galleryBtn");
+const cameraErrorContainer = document.getElementById("cameraErrorContainer");
+const cameraErrorMessage = document.getElementById("cameraErrorMessage");
 const loading = document.getElementById("loading");
 const resultSection = document.getElementById("resultSection");
 const dropArea = document.getElementById("dropArea");
+
+let selectedFile = null;
 
 // ===============================
 // Drag & Drop
@@ -27,34 +37,48 @@ dropArea.addEventListener("drop", (e) => {
     dropArea.classList.remove("dragover");
 
     if (e.dataTransfer.files.length > 0) {
-        imageInput.files = e.dataTransfer.files;
-        showPreview(imageInput.files[0]);
+        if (cameraErrorContainer) cameraErrorContainer.classList.add("hidden");
+        showPreview(e.dataTransfer.files[0]);
     }
 });
 
-dropArea.addEventListener("click", () => {
-    imageInput.click();
-});
-
-imageInput.addEventListener("click", (e) => {
-    e.stopPropagation();
-});
-
-// ===============================
-// Preview Image
-// ===============================
-
-imageInput.addEventListener("change", () => {
-
-    if (imageInput.files.length > 0) {
-
-        showPreview(imageInput.files[0]);
-
+dropArea.addEventListener("click", (e) => {
+    if (e.target.closest("#captureBtn") || e.target.closest("#galleryBtn")) {
+        return;
     }
-
+    if (galleryInput) galleryInput.click();
 });
+
+if (cameraInput) {
+    cameraInput.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    cameraInput.addEventListener("change", () => {
+        if (cameraInput.files.length > 0) {
+            if (cameraErrorContainer) cameraErrorContainer.classList.add("hidden");
+            showPreview(cameraInput.files[0]);
+        }
+    });
+}
+
+if (galleryInput) {
+    galleryInput.addEventListener("click", (e) => {
+        e.stopPropagation();
+    });
+
+    galleryInput.addEventListener("change", () => {
+        if (galleryInput.files.length > 0) {
+            if (cameraErrorContainer) cameraErrorContainer.classList.add("hidden");
+            showPreview(galleryInput.files[0]);
+        }
+    });
+}
 
 function showPreview(file){
+    if (!file) return;
+    
+    selectedFile = file;
 
     const reader = new FileReader();
 
@@ -63,6 +87,10 @@ function showPreview(file){
         previewImage.src = e.target.result;
 
         previewImage.classList.remove("hidden");
+
+        if (previewActionsContainer) {
+            previewActionsContainer.classList.remove("hidden");
+        }
 
         const prefContainer = document.getElementById("treatmentPreferenceContainer");
         if (prefContainer) {
@@ -123,9 +151,9 @@ uploadForm.addEventListener("submit", async function(e){
 
     e.preventDefault();
 
-    if(imageInput.files.length===0){
+    if(!selectedFile){
 
-        alert("Please select an image.");
+        alert("Please select or capture an image.");
 
         return;
 
@@ -143,7 +171,7 @@ uploadForm.addEventListener("submit", async function(e){
 
     const formData=new FormData();
 
-    formData.append("image",imageInput.files[0]);
+    formData.append("image", selectedFile);
 
     const preference = document.querySelector('input[name="treatment_preference"]:checked')?.value || "organic";
     formData.append("treatment_preference", preference);
@@ -735,4 +763,72 @@ function parseDosage(dosageStr) {
         return { val: parseFloat(match[1]), unit: match[2] };
     }
     return null;
+}
+
+function showCameraError(msg) {
+    if (cameraErrorContainer && cameraErrorMessage) {
+        cameraErrorMessage.textContent = msg;
+        cameraErrorContainer.classList.remove("hidden");
+        cameraErrorContainer.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+        alert(msg);
+    }
+}
+
+async function triggerCameraAccess() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+            // Request camera permissions
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            
+            // Release camera tracks
+            stream.getTracks().forEach(track => track.stop());
+            
+            // Trigger hidden input click
+            if (cameraInput) {
+                cameraInput.click();
+            }
+        } catch (err) {
+            console.error("Camera access request failed:", err);
+            
+            // Informative error message based on error name
+            if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+                showCameraError("Camera permission was denied. Please check your browser/device settings to grant camera permission, or select an image from the gallery instead.");
+            } else {
+                showCameraError(`Camera error: ${err.message || err}. Opening gallery selection as fallback.`);
+                if (galleryInput) galleryInput.click();
+            }
+        }
+    } else {
+        showCameraError("Direct camera capture is not supported in this browser. Opening gallery/file selector instead.");
+        if (galleryInput) galleryInput.click();
+    }
+}
+
+if (captureBtn) {
+    captureBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerCameraAccess();
+    });
+}
+
+if (retakeBtn) {
+    retakeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        triggerCameraAccess();
+    });
+}
+
+if (galleryBtn) {
+    galleryBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (galleryInput) galleryInput.click();
+    });
+}
+
+if (changeImageBtn) {
+    changeImageBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (galleryInput) galleryInput.click();
+    });
 }
