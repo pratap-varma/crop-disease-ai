@@ -652,9 +652,270 @@ def predict():
         }), 500
 
 
+
+# -----------------------------
+# Video Analysis Helper
+# -----------------------------
+def consolidate_video_results(frame_results):
+    """
+    Merge per-frame AI results into a single consolidated report.
+    Strategy: majority-vote on crop/disease, union symptoms, conservative
+    confidence (lowest wins) and severity (highest wins).
+    """
+    if not frame_results:
+        return None
+
+    # --- Crop Name: most frequent non-Unknown value ---
+    crop_counts = {}
+    for r in frame_results:
+        cn = (r.get("crop_name") or "").strip()
+        if cn and cn.lower() not in ("unknown", ""):
+            crop_counts[cn] = crop_counts.get(cn, 0) + 1
+    crop_name = max(crop_counts, key=crop_counts.get) if crop_counts else "Unknown"
+
+    # --- Disease Name: most frequent ---
+    disease_counts = {}
+    for r in frame_results:
+        dn = (r.get("disease_name") or "").strip()
+        if dn and dn.lower() not in ("unknown", "unable to detect", "error", "improper image", ""):
+            disease_counts[dn] = disease_counts.get(dn, 0) + 1
+    disease_name = max(disease_counts, key=disease_counts.get) if disease_counts else "Unknown"
+
+    # --- Confidence: conservative (lowest) ---
+    conf_rank = {"High": 3, "Medium": 2, "Low": 1}
+    confidences = [r.get("confidence", "Low") for r in frame_results if r.get("confidence")]
+    min_conf = min(confidences, key=lambda c: conf_rank.get(c, 1), default="Low")
+
+    # --- Severity: conservative (highest) ---
+    sev_rank = {"Healthy": 0, "Mild": 1, "Moderate": 2, "Severe": 3, "Unknown": -1}
+    severities = [r.get("severity", "Unknown") for r in frame_results if r.get("severity")]
+    max_sev = max(severities, key=lambda s: sev_rank.get(s, -1), default="Unknown")
+
+    # --- Symptoms: union (deduplicated) ---
+    all_symptoms = []
+    seen = set()
+    for r in frame_results:
+        for s in (r.get("symptoms") or []):
+            if s and s.lower() not in seen:
+                seen.add(s.lower())
+                all_symptoms.append(s)
+
+    # --- Causes: union (deduplicated) ---
+    all_causes = []
+    seen_c = set()
+    for r in frame_results:
+        for c in (r.get("possible_causes") or []):
+            if c and c.lower() not in seen_c:
+                seen_c.add(c.lower())
+                all_causes.append(c)
+
+    # --- Prevention: union (deduplicated) ---
+    all_prevention = []
+    seen_p = set()
+    for r in frame_results:
+        for p in (r.get("prevention") or []):
+            if p and p.lower() not in seen_p:
+                seen_p.add(p.lower())
+                all_prevention.append(p)
+
+    # --- Treatment: union (deduplicated) ---
+    all_treatment = []
+    seen_t = set()
+    for r in frame_results:
+        for t in (r.get("treatment") or []):
+            if t and t.lower() not in seen_t:
+                seen_t.add(t.lower())
+                all_treatment.append(t)
+
+    # Best fertilizer / watering from the most confident frame
+    best_frame = max(
+        frame_results,
+        key=lambda r: conf_rank.get(r.get("confidence", "Low"), 1),
+        default=frame_results[0]
+    )
+
+    return {
+        "is_clear": True,
+        "analysis_type": "video",
+        "crop_name": crop_name,
+        "disease_name": disease_name,
+        "confidence": min_conf,
+        "severity": max_sev,
+        "symptoms": all_symptoms[:8],
+        "possible_causes": all_causes[:5],
+        "prevention": all_prevention[:5],
+        "treatment": all_treatment[:5],
+        "fertilizer_recommendation": best_frame.get("fertilizer_recommendation", ""),
+        "watering_advice": best_frame.get("watering_advice", ""),
+        "additional_notes": (
+            f"Video analysis — {len(frame_results)} frame(s) analyzed. "
+            "Results consolidated across frames for accuracy."
+        ),
+    }
+
+
+# -----------------------------
+# Video Analysis Route
+# -----------------------------
+@app.route("/predict-video", methods=["POST"])
+def predict_video():
+    """
+    Accepts multiple JPEG frames (extracted client-side) and an optional
+    treatment_preference. Analyzes each frame using the existing Gemini AI
+    pipeline, consolidates the results, and saves a single prediction record
+    (tagged analysis_type='video') to Firestore.
+    """
+
+    treatment_preference = request.form.get("treatment_preference", "pesticides")
+
+    # Collect uploaded frames (named frame_0, frame_1, ...)
+    frame_files = []
+    i = 0
+    while True:
+        key = f"frame_{i}"
+        if key not in request.files:
+            break
+        frame_files.append(request.files[key])
+        i += 1
+
+    if not frame_files:
+        return jsonify({"success": False, "message": "No video frames received. Please try again."}), 400
+
+    # Cap at configured maximum
+    max_frames = Config.VIDEO_MAX_FRAMES
+    frame_files = frame_files[:max_frames]
+
+    saved_paths = []
+    frame_results = []
+    frame_thumbnails = []  # base64 strings for history display
+
+    try:
+        for idx, frame_file in enumerate(frame_files):
+            # Save frame to disk temporarily
+            frame_filename = f"vf_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex}_{idx}.jpg"
+            frame_filename = secure_filename(frame_filename)
+            frame_path = os.path.join(app.config["UPLOAD_FOLDER"], frame_filename)
+            frame_file.save(frame_path)
+            saved_paths.append(frame_path)
+
+            # Analyze the frame
+            try:
+                result = analyze_crop_disease(frame_path, treatment_preference)
+                # Only keep frames that were analyzed successfully
+                if result.get("crop_name") not in [None, ""] or result.get("disease_name") not in [None, ""]:
+                    frame_results.append(result)
+            except Exception as fe:
+                print(f"Frame {idx} analysis error: {fe}")
+
+            # Capture compressed thumbnail for history (max 4 frames)
+            if len(frame_thumbnails) < 4:
+                thumb = get_compressed_base64(frame_path)
+                if thumb:
+                    frame_thumbnails.append(thumb)
+
+        if not frame_results:
+            return jsonify({
+                "success": False,
+                "message": "No crop or plant could be detected in the video frames. Please record a clearer, closer video of the affected crop."
+            }), 400
+
+        # Consolidate results
+        consolidated = consolidate_video_results(frame_results)
+        if not consolidated:
+            return jsonify({
+                "success": False,
+                "message": "Failed to consolidate video analysis results. Please try again."
+            }), 500
+
+        consolidated["frames_analyzed"] = len(frame_results)
+
+        # Validate: must have identifiable crop/disease
+        if not consolidated.get("is_clear", True):
+            return jsonify({
+                "success": False,
+                "message": consolidated.get("additional_notes") or "No clear crop detected in the video. Please record a steady, close-up video of the affected leaf."
+            }), 400
+
+        # Save to Firestore — reuse predictions collection with video tag
+        video_filename = f"video_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex}"
+        try:
+            client = get_db()
+            if client is not None:
+                client.collection("predictions").add({
+                    "filename": video_filename,
+                    "result_json": json.dumps(consolidated),
+                    "image_base64": frame_thumbnails[0] if frame_thumbnails else "",
+                    "frame_thumbnails": frame_thumbnails,
+                    "analysis_type": "video",
+                    "frames_count": len(frame_results),
+                    "treatment_preference": treatment_preference,
+                    "created_at": datetime.utcnow().isoformat()
+                })
+        except Exception as dbe:
+            print(f"Failed to save video prediction: {dbe}")
+
+        # Retrieve treatment guidance — identical logic to /predict
+        treatment_info = get_treatment_guidance(consolidated.get("crop_name"), consolidated.get("disease_name"))
+        if not treatment_info and consolidated.get("crop_name") not in [None, "", "Unknown"] and \
+                consolidated.get("disease_name") not in [None, "", "Unable to Detect", "Error", "Unknown"]:
+            try:
+                from ai_service import generate_treatment_guidance_ai
+                generated_data = generate_treatment_guidance_ai(consolidated.get("crop_name"), consolidated.get("disease_name"))
+                if generated_data:
+                    ok, res_id = save_treatment_record(generated_data)
+                    if ok:
+                        treatment_info = get_treatment_guidance(consolidated.get("crop_name"), consolidated.get("disease_name"))
+            except Exception as ge:
+                print(f"Failed to auto-generate treatment for video result: {ge}")
+
+        if treatment_info:
+            if treatment_preference == "organic":
+                treatment_info = dict(treatment_info)
+                treatment_info["chemical_treatment_name"] = ""
+                treatment_info["active_ingredient"] = ""
+                treatment_info["purpose"] = ""
+                treatment_info["example_brand_names"] = ""
+                treatment_info["mixing_quantity"] = ""
+                treatment_info["water_quantity"] = ""
+                treatment_info["spray_tank_size"] = ""
+                treatment_info["mixing_steps"] = []
+                treatment_info["precautions"] = []
+                treatment_info["ppe_required"] = ""
+                treatment_info["waiting_period_before_harvest"] = ""
+                treatment_info["cost_estimate_medicine"] = 0.0
+                treatment_info["cost_estimate_total"] = treatment_info.get("cost_estimate_labour", 0.0)
+            elif treatment_preference == "pesticides":
+                treatment_info = dict(treatment_info)
+                treatment_info["organic_treatment"] = []
+                treatment_info["alternative_organic_solutions"] = ""
+
+        return jsonify({
+            "success": True,
+            "result": consolidated,
+            "filename": video_filename,
+            "frames_analyzed": len(frame_results),
+            "frame_thumbnails": frame_thumbnails,
+            "treatment_guidance": treatment_info
+        })
+
+    except Exception as e:
+        print(f"Video predict error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+    finally:
+        # Always clean up temporary frame files
+        for p in saved_paths:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+
+
 # -----------------------------
 # Admin Management Functions
 # -----------------------------
+
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

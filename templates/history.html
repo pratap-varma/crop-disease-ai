@@ -113,16 +113,27 @@
                         <div class="flex-grow flex flex-col justify-between">
                             <div>
                                 <div class="flex justify-between items-start mb-3">
-                                    <h2 class="text-xl font-bold text-green-700 cursor-pointer hover:underline" onclick="showReport('{{ item.id }}')">
-                                        {{ item.result.crop_name }} - {{ item.result.disease_name }}
-                                    </h2>
-                                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{{ item.created_at }}</span>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h2 class="text-xl font-bold text-green-700 cursor-pointer hover:underline" onclick="showReport('{{ item.id }}')">
+                                            {{ item.result.crop_name }} - {{ item.result.disease_name }}
+                                        </h2>
+                                        {% if item.result.analysis_type == 'video' %}
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold rounded-full">
+                                            📹 Video
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full shrink-0">{{ item.created_at }}</span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-4">
                                     <p><strong>Confidence:</strong> <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-md font-semibold">{{ item.result.confidence }}</span></p>
                                     <p><strong>Severity:</strong> <span class="px-2 py-0.5 {% if item.result.severity|lower == 'high' %}bg-red-100 text-red-800{% elif item.result.severity|lower == 'medium' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %} rounded-md font-semibold">{{ item.result.severity }}</span></p>
+                                    {% if item.result.analysis_type == 'video' and item.result.frames_analyzed %}
+                                    <p class="col-span-2"><strong>Frames Analyzed:</strong> <span class="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md font-semibold">{{ item.result.frames_analyzed }}</span></p>
+                                    {% endif %}
                                 </div>
                                 <p class="text-gray-700 text-sm"><strong>Notes:</strong> {{ item.result.additional_notes }}</p>
+
                             </div>
                             
                             <div class="flex justify-between items-center mt-6">

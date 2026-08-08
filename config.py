@@ -25,6 +25,12 @@ class Config:
     # Allowed Image Types
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
 
+    # Video Analysis Settings
+    # Max number of extracted frames sent to AI per video (balance accuracy vs. API cost)
+    VIDEO_MAX_FRAMES = 8
+    # Allowed video input types (validated client-side; server validates uploaded frame JPEGs)
+    ALLOWED_VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "avi", "mkv"}
+
     # SMTP Settings for Contact Form
     SMTP_SERVER = os.getenv("SMTP_SERVER", "").strip()
     try:
