@@ -1,5 +1,6 @@
 import os
 import io
+import json
 from datetime import datetime
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image, KeepTogether, PageBreak
 from reportlab.lib.pagesizes import A4
@@ -7,13 +8,98 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.colors import HexColor
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from PIL import Image as PILImage
+
+# Font Setup for Indian scripts support
+has_indic_fonts = False
+
+def setup_indic_fonts():
+    global has_indic_fonts
+    font_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "fonts")
+    os.makedirs(font_dir, exist_ok=True)
+    
+    font_paths = {
+        "FreeSans": os.path.join(font_dir, "FreeSans.ttf"),
+        "FreeSansBold": os.path.join(font_dir, "FreeSansBold.ttf"),
+        "FreeSansOblique": os.path.join(font_dir, "FreeSansOblique.ttf")
+    }
+    
+    urls = {
+        "FreeSans": "https://raw.githubusercontent.com/fedora-infra/freefont/master/FreeSans.ttf",
+        "FreeSansBold": "https://raw.githubusercontent.com/fedora-infra/freefont/master/FreeSansBold.ttf",
+        "FreeSansOblique": "https://raw.githubusercontent.com/fedora-infra/freefont/master/FreeSansOblique.ttf"
+    }
+
+    downloaded = True
+    for name, path in font_paths.items():
+        if not os.path.exists(path):
+            import requests
+            try:
+                print(f"Downloading {name}.ttf for multi-language PDF support...", flush=True)
+                r = requests.get(urls[name], timeout=30)
+                if r.status_code == 200:
+                    with open(path, "wb") as f:
+                        f.write(r.content)
+                    print(f"Downloaded {name}.ttf successfully.", flush=True)
+                else:
+                    print(f"Failed to download {name}.ttf: HTTP {r.status_code}", flush=True)
+                    downloaded = False
+            except Exception as e:
+                print(f"Error downloading {name}.ttf: {e}", flush=True)
+                downloaded = False
+        
+        if os.path.exists(path):
+            try:
+                pdfmetrics.registerFont(TTFont(name, path))
+            except Exception as re:
+                print(f"Error registering font {name}: {re}", flush=True)
+                downloaded = False
+                
+    has_indic_fonts = downloaded
+
+# Try running setup on import
+try:
+    setup_indic_fonts()
+except Exception as e:
+    print(f"Indic font setup failed on load: {e}")
+
+
+def load_pdf_translations(lang_code):
+    translations = {}
+    translations_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
+    
+    # Load English fallback first
+    en_path = os.path.join(translations_dir, "en.json")
+    if os.path.exists(en_path):
+        try:
+            with open(en_path, "r", encoding="utf-8") as f:
+                translations.update(json.load(f))
+        except Exception as e:
+            print(f"Error loading English fallback translations: {e}")
+            
+    # Load selected language
+    if lang_code and lang_code != "en":
+        lang_path = os.path.join(translations_dir, f"{lang_code}.json")
+        if os.path.exists(lang_path):
+            try:
+                with open(lang_path, "r", encoding="utf-8") as f:
+                    translations.update(json.load(f))
+            except Exception as e:
+                print(f"Error loading {lang_code} translations: {e}")
+                
+    return translations
+
 
 class NumberedCanvas(canvas.Canvas):
     """
     Two-pass canvas to dynamically track and print the total page count
     along with professional footer branding on every page.
     """
+    language = "en"
+    translations = {}
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._saved_page_states = []
@@ -32,13 +118,20 @@ class NumberedCanvas(canvas.Canvas):
 
     def draw_page_decorations(self, page_count):
         self.saveState()
-        self.setFont("Helvetica", 8)
+        
+        font_name = "FreeSans" if has_indic_fonts else "Helvetica"
+        self.setFont(font_name, 8)
         self.setFillColor(HexColor("#4B5563")) # gray-600
+        
+        def translate_canvas(key, default):
+            return NumberedCanvas.translations.get(key, default)
         
         # 1. Header decoration (only on page 2 and later)
         if self._pageNumber > 1:
-            self.drawString(36, 805, "AI Crop Disease Analysis Report")
-            self.drawRightString(559, 805, "CropDiseaseAI Diagnostics")
+            title_text = translate_canvas("pdf.report_title", "AI Crop Disease Analysis Report")
+            subtitle_text = translate_canvas("pdf.report_subtitle", "CropDiseaseAI Diagnostics")
+            self.drawString(36, 805, title_text)
+            self.drawRightString(559, 805, subtitle_text)
             self.setStrokeColor(HexColor("#E5E7EB")) # gray-200
             self.setLineWidth(0.5)
             self.line(36, 798, 559, 798)
@@ -48,8 +141,11 @@ class NumberedCanvas(canvas.Canvas):
         self.setLineWidth(0.5)
         self.line(36, 45, 559, 45)
         
-        self.drawString(36, 30, "Generated by CropDiseaseAI | Confidential Diagnostic Report")
-        page_str = f"Page {self._pageNumber} of {page_count}"
+        footer_brand = translate_canvas("pdf.footer_branding", "Generated by CropDiseaseAI | Confidential Diagnostic Report")
+        self.drawString(36, 30, footer_brand)
+        
+        page_str_template = translate_canvas("pdf.page_num_text", "Page {page_num} of {total_pages}")
+        page_str = page_str_template.format(page_num=self._pageNumber, total_pages=page_count)
         self.drawRightString(559, 30, page_str)
         
         self.restoreState()
@@ -60,6 +156,17 @@ def generate_pdf_report(data, username=None):
     Generates a professional A4 PDF bytes buffer from analysis results.
     Supports single dictionary report or list/collection of reports.
     """
+    # Load translations & register to canvas
+    lang = "en"
+    if isinstance(data, dict):
+        lang = data.get("language", "en")
+    elif isinstance(data, list) and len(data) > 0:
+        lang = data[0].get("language", "en")
+        
+    translations = load_pdf_translations(lang)
+    NumberedCanvas.language = lang
+    NumberedCanvas.translations = translations
+
     # Check if this is a bulk reports compilation
     if isinstance(data, list):
         reports_list = data
@@ -86,12 +193,16 @@ def generate_pdf_report(data, username=None):
     TEXT_MUTED = HexColor("#4B5563")      # Gray 600
     BORDER_COLOR = HexColor("#86EFAC")    # Green 300
     
+    font_regular = "FreeSans" if has_indic_fonts else "Helvetica"
+    font_bold = "FreeSansBold" if has_indic_fonts else "Helvetica-Bold"
+    font_oblique = "FreeSansOblique" if has_indic_fonts else "Helvetica-Oblique"
+
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle(
         "DocTitle",
         parent=styles["Heading1"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=18,
         leading=22,
         textColor=PRIMARY_GREEN,
@@ -101,7 +212,7 @@ def generate_pdf_report(data, username=None):
     section_heading = ParagraphStyle(
         "SectionHeading",
         parent=styles["Heading2"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=12,
         leading=16,
         textColor=PRIMARY_GREEN,
@@ -113,7 +224,7 @@ def generate_pdf_report(data, username=None):
     subsection_heading = ParagraphStyle(
         "SubsectionHeading",
         parent=styles["Heading3"],
-        fontName="Helvetica-Bold",
+        fontName=font_bold,
         fontSize=10,
         leading=14,
         textColor=TEXT_DARK,
@@ -125,7 +236,7 @@ def generate_pdf_report(data, username=None):
     body_style = ParagraphStyle(
         "BodyTextDark",
         parent=styles["Normal"],
-        fontName="Helvetica",
+        fontName=font_regular,
         fontSize=9.5,
         leading=13.5,
         textColor=TEXT_DARK,
@@ -135,13 +246,13 @@ def generate_pdf_report(data, username=None):
     body_bold = ParagraphStyle(
         "BodyTextBold",
         parent=body_style,
-        fontName="Helvetica-Bold"
+        fontName=font_bold
     )
     
     disclaimer_style = ParagraphStyle(
         "DisclaimerText",
         parent=styles["Normal"],
-        fontName="Helvetica-Oblique",
+        fontName=font_oblique,
         fontSize=8,
         leading=11.5,
         textColor=TEXT_MUTED,
@@ -154,8 +265,16 @@ def generate_pdf_report(data, username=None):
         # Parse current report data
         crop_name = report.get("crop_name", "N/A")
         disease_name = report.get("disease_name", "N/A")
-        confidence = report.get("confidence", "N/A")
-        severity = report.get("severity", "N/A")
+        
+        # Translate confidence & severity values in PDF
+        confidence_val = report.get("confidence", "N/A")
+        confidence_key = f"confidence.{confidence_val.lower()}"
+        confidence = translations.get(confidence_key, confidence_val)
+
+        severity_val = report.get("severity", "N/A")
+        severity_key = f"severity.{severity_val.lower()}"
+        severity = translations.get(severity_key, severity_val)
+
         symptoms = report.get("symptoms", [])
         possible_causes = report.get("possible_causes", [])
         prevention = report.get("prevention", [])
@@ -172,13 +291,13 @@ def generate_pdf_report(data, username=None):
         if os.path.exists(logo_path):
             logo_img = Image(logo_path, width=42, height=42)
         else:
-            logo_img = Paragraph("🌱", ParagraphStyle("LogoText", fontName="Helvetica", fontSize=28, leading=32))
+            logo_img = Paragraph("🌱", ParagraphStyle("LogoText", fontName=font_regular, fontSize=28, leading=32))
             
-        title_text = "<b>AI Crop Disease Analysis Report</b><br/><font size=8.5 color='#4B5563'>Generated by CropDiseaseAI Diagnostics</font>"
+        title_text = f"<b>{translations.get('pdf.report_title', 'AI Crop Disease Analysis Report')}</b><br/><font size=8.5 color='#4B5563'>{translations.get('pdf.report_subtitle', 'Generated by CropDiseaseAI Diagnostics')}</font>"
         title_p = Paragraph(title_text, title_style)
         
         date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        meta_html = f"<b>Date:</b> {date_str}<br/><b>Prepared For:</b> {username or 'Guest User'}"
+        meta_html = f"<b>{translations.get('pdf.date', 'Date')}:</b> {date_str}<br/><b>{translations.get('pdf.prepared_for', 'Prepared For')}:</b> {username or 'Guest User'}"
         meta_p = Paragraph(meta_html, body_style)
         
         header_table = Table([[logo_img, title_p, meta_p]], colWidths=[55, 300, 168])
@@ -203,10 +322,10 @@ def generate_pdf_report(data, username=None):
 
         # General Information & Leaf Image Card
         details_data = [
-            [Paragraph("<b>Crop Name:</b>", body_style), Paragraph(crop_name, body_style)],
-            [Paragraph("<b>Disease Identified:</b>", body_style), Paragraph(disease_name, body_style)],
-            [Paragraph("<b>Confidence Level:</b>", body_style), Paragraph(confidence, body_style)],
-            [Paragraph("<b>Severity Level:</b>", body_style), Paragraph(severity, body_style)],
+            [Paragraph(f"<b>{translations.get('pdf.crop_name', 'Crop Name')}:</b>", body_style), Paragraph(crop_name, body_style)],
+            [Paragraph(f"<b>{translations.get('pdf.disease_identified', 'Disease Identified')}:</b>", body_style), Paragraph(disease_name, body_style)],
+            [Paragraph(f"<b>{translations.get('pdf.confidence_level', 'Confidence Level')}:</b>", body_style), Paragraph(confidence, body_style)],
+            [Paragraph(f"<b>{translations.get('pdf.severity_level', 'Severity Level')}:</b>", body_style), Paragraph(severity, body_style)],
         ]
         details_table = Table(details_data, colWidths=[110, 190])
         details_table.setStyle(TableStyle([
@@ -251,13 +370,13 @@ def generate_pdf_report(data, username=None):
         story.append(Spacer(1, 10))
 
         # Diagnosis Section: Symptoms & Causes side-by-side
-        story.append(Paragraph("Diagnostic Finding Details", section_heading))
+        story.append(Paragraph(translations.get('pdf.diagnostic_details', 'Diagnostic Finding Details'), section_heading))
         
         symptom_bullets = "".join([f"• {s}<br/>" for s in symptoms]) if symptoms else "• None described."
         cause_bullets = "".join([f"• {c}<br/>" for c in possible_causes]) if possible_causes else "• None described."
         
         diag_data = [
-            [Paragraph("<b>🔍 Observed Symptoms:</b>", body_bold), Paragraph("<b>⚠️ Possible Causes:</b>", body_bold)],
+            [Paragraph(f"<b>🔍 {translations.get('pdf.observed_symptoms', 'Observed Symptoms')}:</b>", body_bold), Paragraph(f"<b>⚠️ {translations.get('pdf.possible_causes', 'Possible Causes')}:</b>", body_bold)],
             [Paragraph(symptom_bullets, body_style), Paragraph(cause_bullets, body_style)]
         ]
         diag_table = Table(diag_data, colWidths=[256, 267])
@@ -274,13 +393,13 @@ def generate_pdf_report(data, username=None):
         story.append(Spacer(1, 10))
 
         # Management & Action Plan
-        story.append(Paragraph("Agricultural Management Recommendations", section_heading))
+        story.append(Paragraph(translations.get('pdf.management_recommendations', 'Agricultural Recommendations'), section_heading))
         
         prevention_bullets = "".join([f"• {p}<br/>" for p in prevention]) if prevention else "• None described."
         treatment_bullets = "".join([f"• {t}<br/>" for t in treatment]) if treatment else "• None described."
         
         action_data = [
-            [Paragraph("<b>🛡️ Prevention Measures:</b>", body_bold), Paragraph("<b>💊 Recommended Treatments:</b>", body_bold)],
+            [Paragraph(f"<b>🛡️ {translations.get('pdf.prevention_measures', 'Prevention Measures')}:</b>", body_bold), Paragraph(f"<b>💊 {translations.get('pdf.recommended_treatments', 'Recommended Treatments')}:</b>", body_bold)],
             [Paragraph(prevention_bullets, body_style), Paragraph(treatment_bullets, body_style)]
         ]
         action_table = Table(action_data, colWidths=[256, 267])
@@ -298,9 +417,9 @@ def generate_pdf_report(data, username=None):
 
         # Nutrients, Watering & Additional Notes
         notes_data = [
-            [Paragraph("<b>🧪 Fertilizer Recommendation:</b>", body_bold), Paragraph(fertilizer, body_style)],
-            [Paragraph("<b>💧 Irrigation & Water Advice:</b>", body_bold), Paragraph(watering, body_style)],
-            [Paragraph("<b>📝 Additional Notes:</b>", body_bold), Paragraph(notes, body_style)],
+            [Paragraph(f"<b>🧪 {translations.get('pdf.fertilizer_recommendation', 'Fertilizer Recommendation')}:</b>", body_bold), Paragraph(fertilizer, body_style)],
+            [Paragraph(f"<b>💧 {translations.get('pdf.water_advice', 'Irrigation & Water Advice')}:</b>", body_bold), Paragraph(watering, body_style)],
+            [Paragraph(f"<b>📝 {translations.get('pdf.additional_notes', 'Additional Notes')}:</b>", body_bold), Paragraph(notes, body_style)],
         ]
         notes_table = Table(notes_data, colWidths=[150, 373])
         notes_table.setStyle(TableStyle([
@@ -315,28 +434,45 @@ def generate_pdf_report(data, username=None):
         # Verified Treatment Guidance Section (if available)
         if treatment_guidance:
             tg_elements = []
-            tg_elements.append(Paragraph("Verified Agricultural Treatment Guidance", section_heading))
+            tg_elements.append(Paragraph(translations.get('pdf.verified_treatment_guidance', 'Verified Agricultural Treatment Guidance'), section_heading))
             
             # Organic step block
             if treatment_guidance.get("organic_treatment"):
-                tg_elements.append(Paragraph("<b>Organic Treatment Protocol:</b>", subsection_heading))
+                tg_elements.append(Paragraph(f"<b>{translations.get('pdf.organic_protocol', 'Organic Treatment Protocol')}:</b>", subsection_heading))
                 for idx, step in enumerate(treatment_guidance.get("organic_treatment")):
                     tg_elements.append(Paragraph(f"<b>Step {idx+1}:</b> {step}", body_style))
                 if treatment_guidance.get("alternative_organic_solutions"):
-                    tg_elements.append(Paragraph(f"<i>Organic Alternatives:</i> {treatment_guidance.get('alternative_organic_solutions')}", body_style))
+                    tg_elements.append(Paragraph(f"<i>{translations.get('pdf.organic_alternatives', 'Organic Alternatives')}:</i> {treatment_guidance.get('alternative_organic_solutions')}", body_style))
                 tg_elements.append(Spacer(1, 6))
 
             # Chemical medicine table
             if treatment_guidance.get("chemical_treatment_name"):
-                tg_elements.append(Paragraph("<b>Chemical Treatment & Dosage:</b>", subsection_heading))
+                tg_elements.append(Paragraph(f"<b>{translations.get('pdf.chemical_treatment_dosage', 'Chemical Treatment & Dosage Plan')}:</b>", subsection_heading))
+                
+                equip_text = translations.get('pdf.dissolve_text', 'Dissolve {mixing_quantity} in {water_quantity} of water.').format(
+                    mixing_quantity=treatment_guidance.get('mixing_quantity', 'N/A'),
+                    water_quantity=treatment_guidance.get('water_quantity', '15 Litres')
+                )
+                
+                timing_text = translations.get('pdf.timing_text', 'Apply at {spray_timing}. Repeat after {spray_interval} as required (Max {number_of_applications} applications).').format(
+                    spray_timing=treatment_guidance.get('spray_timing', 'N/A'),
+                    spray_interval=treatment_guidance.get('spray_interval', 'N/A'),
+                    number_of_applications=treatment_guidance.get('number_of_applications', 'N/A')
+                )
+                
+                safety_text = translations.get('pdf.safety_text', 'Harvest wait time: {waiting_period_before_harvest}. PPE Required: {ppe_required}.').format(
+                    waiting_period_before_harvest=treatment_guidance.get('waiting_period_before_harvest', 'N/A'),
+                    ppe_required=treatment_guidance.get('ppe_required', 'N/A')
+                )
+                
                 chem_rows = [
-                    [Paragraph("<b>Medicine Name:</b>", body_style), Paragraph(treatment_guidance.get("chemical_treatment_name"), body_style)],
-                    [Paragraph("<b>Active Ingredient:</b>", body_style), Paragraph(treatment_guidance.get("active_ingredient", "N/A"), body_style)],
-                    [Paragraph("<b>Brand Examples:</b>", body_style), Paragraph(treatment_guidance.get("example_brand_names", "N/A"), body_style)],
-                    [Paragraph("<b>Application Method:</b>", body_style), Paragraph(treatment_guidance.get("application_method", "N/A"), body_style)],
-                    [Paragraph("<b>Spray Equipment Base:</b>", body_style), Paragraph(f"Dissolve {treatment_guidance.get('mixing_quantity', 'N/A')} in {treatment_guidance.get('water_quantity', '15 Litres')} of water.", body_style)],
-                    [Paragraph("<b>Timing & Intervals:</b>", body_style), Paragraph(f"Apply at {treatment_guidance.get('spray_timing', 'N/A')}. Repeat after {treatment_guidance.get('spray_interval', 'N/A')} as required (Max {treatment_guidance.get('number_of_applications', 'N/A')} applications).", body_style)],
-                    [Paragraph("<b>Safety Waiting Period:</b>", body_style), Paragraph(f"Harvest wait time: {treatment_guidance.get('waiting_period_before_harvest', 'N/A')}. PPE Required: {treatment_guidance.get('ppe_required', 'N/A')}.", body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.medicine_name', 'Medicine Name')}:</b>", body_style), Paragraph(treatment_guidance.get("chemical_treatment_name"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.active_ingredient', 'Active Ingredient')}:</b>", body_style), Paragraph(treatment_guidance.get("active_ingredient", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.brand_examples', 'Common Brand Examples')}:</b>", body_style), Paragraph(treatment_guidance.get("example_brand_names", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.application_method', 'Application Method')}:</b>", body_style), Paragraph(treatment_guidance.get("application_method", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.spray_equipment_base', 'Spray Equipment Base')}:</b>", body_style), Paragraph(equip_text, body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.timing_intervals', 'Timing & Frequency')}:</b>", body_style), Paragraph(timing_text, body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.safety_waiting_period', 'Safety & Harvest Waiting Period')}:</b>", body_style), Paragraph(safety_text, body_style)],
                 ]
                 chem_table = Table(chem_rows, colWidths=[140, 383])
                 chem_table.setStyle(TableStyle([
@@ -350,14 +486,26 @@ def generate_pdf_report(data, username=None):
 
             # Sprayer Calibration Metrics
             if calculator_metrics:
-                tg_elements.append(Paragraph("<b>Sprayer Calibration & Dosage Field Plan:</b>", subsection_heading))
+                tg_elements.append(Paragraph(f"<b>{translations.get('pdf.sprayer_field_plan', 'Sprayer Calibration & Field Plan')}:</b>", subsection_heading))
+                
+                tank_mix_text = translations.get('pdf.per_tank_mix_text', 'Mix {per_tank_dosage} per tank (Capacity: {tank_capacity} L).').format(
+                    per_tank_dosage=calculator_metrics.get('per_tank_dosage', 'N/A'),
+                    tank_capacity=calculator_metrics.get('tank_capacity')
+                )
+                
+                costs_text = translations.get('pdf.costs_text', 'Medicine: {cost_medicine} | Labor: {cost_labour} | Total: {cost_total}').format(
+                    cost_medicine=calculator_metrics.get('cost_medicine', 'N/A'),
+                    cost_labour=calculator_metrics.get('cost_labour', 'N/A'),
+                    cost_total=calculator_metrics.get('cost_total', 'N/A')
+                )
+                
                 metrics_rows = [
-                    [Paragraph("<b>Land Size:</b>", body_style), Paragraph(f"{calculator_metrics.get('land_size')} {calculator_metrics.get('land_unit')}", body_style)],
-                    [Paragraph("<b>Total Field Medicine:</b>", body_style), Paragraph(calculator_metrics.get("total_medicine", "N/A"), body_style)],
-                    [Paragraph("<b>Total Field Water:</b>", body_style), Paragraph(calculator_metrics.get("total_water", "N/A"), body_style)],
-                    [Paragraph("<b>Sprayer Runs:</b>", body_style), Paragraph(calculator_metrics.get("tanks_count", "N/A"), body_style)],
-                    [Paragraph("<b>Per-Tank Mix Dosage:</b>", body_style), Paragraph(f"Mix {calculator_metrics.get('per_tank_dosage', 'N/A')} per tank (Capacity: {calculator_metrics.get('tank_capacity')} L).", body_style)],
-                    [Paragraph("<b>Estimated Costs:</b>", body_style), Paragraph(f"Medicine: {calculator_metrics.get('cost_medicine', 'N/A')} | Labor: {calculator_metrics.get('cost_labour', 'N/A')} | Total: {calculator_metrics.get('cost_total', 'N/A')}", body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.land_size', 'Land Size')}:</b>", body_style), Paragraph(f"{calculator_metrics.get('land_size')} {calculator_metrics.get('land_unit')}", body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.total_field_medicine', 'Total Field Medicine')}:</b>", body_style), Paragraph(calculator_metrics.get("total_medicine", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.total_field_water', 'Total Field Water')}:</b>", body_style), Paragraph(calculator_metrics.get("total_water", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.sprayer_runs', 'Sprayer Runs')}:</b>", body_style), Paragraph(calculator_metrics.get("tanks_count", "N/A"), body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.per_tank_dosage', 'Per-Tank Mix Dosage')}:</b>", body_style), Paragraph(tank_mix_text, body_style)],
+                    [Paragraph(f"<b>{translations.get('pdf.estimated_costs', 'Estimated Costs')}:</b>", body_style), Paragraph(costs_text, body_style)],
                 ]
                 metrics_table = Table(metrics_rows, colWidths=[140, 383])
                 metrics_table.setStyle(TableStyle([
@@ -373,21 +521,15 @@ def generate_pdf_report(data, username=None):
             source = treatment_guidance.get("government_advisory_source")
             updated = treatment_guidance.get("last_updated_date")
             if source:
-                tg_elements.append(Paragraph(f"<i>Source: {source} | Last Updated: {updated or 'N/A'}</i>", disclaimer_style))
+                tg_elements.append(Paragraph(translations.get('pdf.source_text', 'Source: {source} | Last Updated: {updated_date}').format(source=source, updated_date=updated or 'N/A'), disclaimer_style))
                 
             story.append(KeepTogether(tg_elements))
             story.append(Spacer(1, 10))
 
         # AI Disclaimer Block
         disclaimer_elements = []
-        disclaimer_elements.append(Paragraph("<b>AI Diagnostics Disclaimer:</b>", body_bold))
-        disclaimer_text = (
-            "This report is generated by an artificial intelligence model (Gemini 1.5 Flash). "
-            "AI predictions are for educational and informational purposes only. "
-            "Always cross-reference AI recommendations with local agricultural extension offices "
-            "or a certified agronomist before applying chemical treatments, fertilizers, or modifying watering management schedules. "
-            "CropDiseaseAI is not liable for crop failure, chemical damage, or improper dosage application."
-        )
+        disclaimer_elements.append(Paragraph(f"<b>{translations.get('pdf.ai_disclaimer_title', 'AI Diagnostics Disclaimer')}:</b>", body_bold))
+        disclaimer_text = translations.get('pdf.ai_disclaimer_text', '')
         disclaimer_elements.append(Paragraph(disclaimer_text, disclaimer_style))
         story.append(KeepTogether(disclaimer_elements))
 

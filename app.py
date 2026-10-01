@@ -68,6 +68,11 @@ def uploaded_file(filename):
         
     return "Image not found", 404
 
+
+@app.route("/translations/<path:filename>")
+def get_translation_file(filename):
+    return send_from_directory(os.path.join(app.root_path, "translations"), filename)
+
 # -----------------------------
 # Firebase Initialization
 # -----------------------------
@@ -581,11 +586,12 @@ def predict():
         # Save uploaded image
         file.save(filepath)
 
-        # Extract treatment preference
+        # Extract treatment preference and language
         treatment_preference = request.form.get("treatment_preference", "pesticides")
+        language = request.form.get("language", "en")
 
         # Analyze using Gemini
-        result = analyze_crop_disease(filepath, treatment_preference)
+        result = analyze_crop_disease(filepath, treatment_preference, language)
 
         # Validate image clarity and plant presence
         if not result.get("is_clear", True):
@@ -605,7 +611,7 @@ def predict():
         if not treatment_info and result.get("crop_name") not in [None, "", "Unknown"] and result.get("disease_name") not in [None, "", "Unable to Detect", "Error"]:
             try:
                 from ai_service import generate_treatment_guidance_ai
-                generated_data = generate_treatment_guidance_ai(result.get("crop_name"), result.get("disease_name"))
+                generated_data = generate_treatment_guidance_ai(result.get("crop_name"), result.get("disease_name"), language)
                 if generated_data:
                     ok, res_id = save_treatment_record(generated_data)
                     if ok:
@@ -614,6 +620,13 @@ def predict():
                 print(f"Failed to auto-generate treatment record on prediction: {ge}")
 
         if treatment_info:
+            if language != "en":
+                try:
+                    from ai_service import translate_treatment_info
+                    treatment_info = translate_treatment_info(treatment_info, language)
+                except Exception as te:
+                    print(f"Failed to translate treatment guidance: {te}")
+
             if treatment_preference == "organic":
                 treatment_info = dict(treatment_info)
                 treatment_info["chemical_treatment_name"] = ""
@@ -781,6 +794,8 @@ def predict_video():
     if not frame_files:
         return jsonify({"success": False, "message": "No video frames received. Please try again."}), 400
 
+    language = request.form.get("language", "en")
+
     # Cap at configured maximum
     max_frames = Config.VIDEO_MAX_FRAMES
     frame_files = frame_files[:max_frames]
@@ -800,7 +815,7 @@ def predict_video():
 
             # Analyze the frame
             try:
-                result = analyze_crop_disease(frame_path, treatment_preference)
+                result = analyze_crop_disease(frame_path, treatment_preference, language)
                 # Only keep frames that were analyzed successfully
                 if result.get("crop_name") not in [None, ""] or result.get("disease_name") not in [None, ""]:
                     frame_results.append(result)
@@ -860,7 +875,7 @@ def predict_video():
                 consolidated.get("disease_name") not in [None, "", "Unable to Detect", "Error", "Unknown"]:
             try:
                 from ai_service import generate_treatment_guidance_ai
-                generated_data = generate_treatment_guidance_ai(consolidated.get("crop_name"), consolidated.get("disease_name"))
+                generated_data = generate_treatment_guidance_ai(consolidated.get("crop_name"), consolidated.get("disease_name"), language)
                 if generated_data:
                     ok, res_id = save_treatment_record(generated_data)
                     if ok:
@@ -869,6 +884,13 @@ def predict_video():
                 print(f"Failed to auto-generate treatment for video result: {ge}")
 
         if treatment_info:
+            if language != "en":
+                try:
+                    from ai_service import translate_treatment_info
+                    treatment_info = translate_treatment_info(treatment_info, language)
+                except Exception as te:
+                    print(f"Failed to translate treatment guidance: {te}")
+
             if treatment_preference == "organic":
                 treatment_info = dict(treatment_info)
                 treatment_info["chemical_treatment_name"] = ""
@@ -1318,6 +1340,10 @@ def generate_pdf():
         if not data:
             return jsonify({"success": False, "message": "No data provided"}), 400
             
+        # Ensure target language is passed to PDF generator
+        if "language" not in data:
+            data["language"] = request.cookies.get("selected_lang", "en")
+
         username = session.get("username")
         pdf_bytes = generate_pdf_report(data, username=username)
         

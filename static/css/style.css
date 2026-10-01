@@ -323,52 +323,110 @@ footer p{
 
 }
 
+/* ==========================================================================
+   Google Translate Complete Hide - Suppress Logo, Banner, Tooltips & Spacing
+   ========================================================================== */
+
+/* Prevent shifting / banner display / top gap */
+html,
+body,
+body.translated-ltr,
+body.translated-rtl,
+html.translated-ltr,
+html.translated-rtl {
+    top: 0px !important;
+    position: static !important;
+    margin-top: 0px !important;
+    padding-top: 0px !important;
+}
+
 /* Hide Google Translate element widget from navbar */
 #google_translate_element {
     display: none !important;
 }
 
-/* Prevent shifting / banner display / margins */
-html,
-body,
-.translated-ltr,
-.translated-rtl {
-    top: 0px !important;
-    margin-top: 0px !important;
-    position: static !important;
-}
-
 /* Force override Google Translate iframe top position and visibility */
 iframe.goog-te-banner-frame,
+iframe.goog-te-menu-frame,
+iframe.skiptranslate,
+iframe[class*="VIpgJd"],
+iframe[id*=":1.container"],
+iframe[id*=":2.container"],
+iframe[src*="translate.google"],
 .goog-te-banner-frame,
-.skiptranslate,
-#goog-gt-tt,
-.goog-tooltip,
-.goog-tooltip:hover {
+.goog-te-banner,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMy,
+.VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+.VIpgJd-ZVi9od-l4eHX-hSRLGd,
+[class*="VIpgJd-ZVi9od"],
+body > .skiptranslate,
+body > div[class*="skiptranslate"],
+body > div[class*="VIpgJd"] {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
     height: 0px !important;
     width: 0px !important;
+    max-height: 0px !important;
+    max-width: 0px !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    z-index: -99999 !important;
+}
+
+/* Hide branding, logo links, icons inside or outside the widget container */
+.goog-logo-link,
+.goog-logo-link:link,
+.goog-logo-link:visited,
+.goog-logo-link:hover,
+.goog-logo-link:active,
+.goog-te-gadget-icon,
+img.goog-te-gadget-icon,
+img[src*="googlelogo"],
+img[src*="translate.googleapis.com"],
+img[src*="gstatic.com/images/branding"],
+.goog-te-gadget span,
+.goog-te-gadget a,
+.goog-te-gadget form,
+.goog-te-gadget div,
+.goog-te-gadget img {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0px !important;
+    width: 0px !important;
+    pointer-events: none !important;
+}
+
+.goog-te-gadget {
+    color: transparent !important;
+    font-size: 0px !important;
+    line-height: 0 !important;
+}
+
+/* Tooltips, balloons, spinners and text highlights */
+#goog-gt-tt,
+[id*="goog-gt-"],
+.goog-tooltip,
+.goog-tooltip:hover,
+.goog-te-balloon-frame,
+.goog-te-spinner-pos {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 .goog-text-highlight {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-}
-
-/* Hide branding and frame elements inside the widget container */
-.goog-logo-link,
-.goog-te-gadget span,
-.goog-te-gadget a,
-.goog-te-gadget form,
-.goog-te-gadget div {
-    display: none !important;
-}
-.goog-te-gadget {
-    color: transparent !important;
-    font-size: 0px !important;
 }
 
 /* Style the select dropdown dropdown box */
@@ -596,13 +654,11 @@ iframe.goog-te-banner-frame,
 }
 
 /* ===========================
-   Google Translate Styling
+   Google Translate Extra Safeguards
    =========================== */
-.goog-te-banner-frame {
+.goog-te-banner-frame,
+.goog-te-menu-frame {
     display: none !important;
-}
-body {
-    top: 0px !important;
 }
 .goog-logo-link,
 .goog-logo-link:link,

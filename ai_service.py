@@ -16,11 +16,18 @@ def _get_api_key():
     return api_key
 
 
-def analyze_crop_disease(image_path, treatment_preference="pesticides"):
+def analyze_crop_disease(image_path, treatment_preference="pesticides", language="en"):
     """Analyze crop image using Gemini AI."""
 
     api_key = _get_api_key()
     genai.configure(api_key=api_key)
+
+    lang_map = {
+        "en": "English", "te": "Telugu", "hi": "Hindi", "ta": "Tamil",
+        "kn": "Kannada", "ml": "Malayalam", "mr": "Marathi", "bn": "Bengali",
+        "gu": "Gujarati", "pa": "Punjabi", "or": "Odia"
+    }
+    lang_name = lang_map.get(language, "English")
 
     if treatment_preference == "organic":
         preference_instruction = "The user prefers ORGANIC treatments. The suggested 'treatment' list, advice, and recommendations MUST be 100% organic, biological, natural, and cultural. DO NOT suggest, name, or mention any synthetic chemicals, medicines, pesticides, fungicides, or commercial chemical sprays."
@@ -32,6 +39,26 @@ You are an expert agricultural scientist.
 
 Analyze the uploaded crop image carefully.
 {preference_instruction}
+
+IMPORTANT LANGUAGE & TRANSLATION DIRECTIVE:
+You MUST generate the report values in the language: {lang_name}.
+Specifically, translate the values of these fields into {lang_name}:
+- crop_name (Where appropriate, display: Local-language name + Scientific/English name. Example: 'మొక్కజొన్న (Corn (Maize))')
+- disease_name (Where appropriate, display: Local-language name + Scientific/English name. Example: 'ఆకు మచ్చ తెగులు (Leaf Spot)')
+- symptoms (list of 3-5 points in {lang_name})
+- possible_causes (list of 3-5 points in {lang_name})
+- prevention (list of 3-5 points in {lang_name})
+- treatment (list of 3-5 points in {lang_name})
+- fertilizer_recommendation (in {lang_name})
+- watering_advice (in {lang_name})
+- additional_notes (in {lang_name})
+
+Keep the JSON keys exactly in English as defined below.
+Do NOT translate enum values for "confidence" (must be "High", "Medium", or "Low" in English) and "severity" (must be "Healthy", "Mild", "Moderate", or "Severe" in English).
+
+AI SAFETY & QUANTITY PRESERVATION RULES:
+1. Do NOT translate or modify any medicine/chemical names, active ingredients, formulations, application rates, numbers, quantities, units, or waiting periods incorrectly.
+2. Keep all numerical values and units (e.g., '10 ml', '5 litres', '15 days', '25°C', '78%') exactly as they are in their standard forms. The surrounding text descriptions can be in {lang_name}, but keep the values like '10 ml' or '5 kg' exactly as is.
 
 Return ONLY valid JSON.
 
@@ -56,7 +83,7 @@ Rules:
 3. Confidence: High, Medium or Low.
 4. Severity: Healthy, Mild, Moderate or Severe.
 5. Each list must contain 3-5 points.
-6. First, assess the image quality. If the image is blurry, out of focus, has improper lighting, does not clearly show a crop/leaf/plant, or is otherwise of poor clarity, set "is_clear" to false, "crop_name" to "Unknown", "disease_name" to "Improper Image", and write a request in "additional_notes" asking the user to upload a clear, high-quality, focused close-up image of the affected crop leaf. Leave all other fields empty.
+6. First, assess the image quality. If the image is blurry, out of focus, has improper lighting, does not clearly show a crop/leaf/plant, or is otherwise of poor clarity, set "is_clear" to false, "crop_name" to "Unknown", "disease_name" to "Improper Image", and write a request in "additional_notes" asking the user to upload a clear, high-quality, focused close-up image of the affected crop leaf in {lang_name}. Leave all other fields empty.
 """
 
     try:
@@ -131,7 +158,7 @@ Rules:
         }
 
 
-def generate_treatment_guidance_ai(crop_name, disease_name):
+def generate_treatment_guidance_ai(crop_name, disease_name, language="en"):
     """Generates complete treatment guidance for a crop-disease combination using Gemini."""
     try:
         api_key = _get_api_key()
@@ -139,12 +166,38 @@ def generate_treatment_guidance_ai(crop_name, disease_name):
     except Exception as e:
         print(f"Gemini API key setup failed: {e}")
         return None
+        
+    lang_map = {
+        "en": "English", "te": "Telugu", "hi": "Hindi", "ta": "Tamil",
+        "kn": "Kannada", "ml": "Malayalam", "mr": "Marathi", "bn": "Bengali",
+        "gu": "Gujarati", "pa": "Punjabi", "or": "Odia"
+    }
+    lang_name = lang_map.get(language, "English")
     
     prompt = f"""
 You are a senior agronomist and crop protection scientist.
 Generate a comprehensive, scientifically-accurate agricultural treatment plan for the following:
 Crop: {crop_name}
 Disease: {disease_name}
+
+IMPORTANT LANGUAGE REQUIREMENT:
+You MUST generate the description strings and list values of the JSON in: {lang_name}.
+Specifically:
+- organic_treatment (list of steps in {lang_name})
+- alternative_organic_solutions (in {lang_name})
+- purpose (in {lang_name})
+- mixing_steps (list of steps in {lang_name})
+- application_method (in {lang_name})
+- where_to_spray (list of areas in {lang_name})
+- spray_timing (in {lang_name})
+- precautions (list of precautions in {lang_name})
+
+Keep the JSON keys exactly in English as defined below.
+
+AI SAFETY & QUANTITY PRESERVATION RULES:
+1. Do NOT translate or modify any medicine/chemical names, active ingredients, brand names, formulations, numbers, quantities, units, application rates, spray intervals, costs, or waiting periods incorrectly.
+2. Keep all chemical active ingredients (e.g. 'Propiconazole 25% EC'), brand name examples (e.g. 'Tilt'), mixing quantities (e.g. '20 ml', '30 g'), water quantities (e.g. '15 Litres'), tank sizes (e.g. '15 L'), spray intervals (e.g. '10 Days', '7 Days'), and harvest waiting periods (e.g. '30 Days', '14 Days') exactly as they are in English/Standard forms.
+3. Keep safety gear / PPE (e.g. 'Mask, Gloves, Goggles') and numeric costs (e.g. 300.0) in standard English.
 
 Return ONLY valid JSON with this exact structure:
 {{
@@ -204,3 +257,60 @@ Rules:
     except Exception as e:
         print(f"Failed to generate treatment guidance via AI: {e}")
         return None
+
+
+def translate_treatment_info(treatment_info, language="en"):
+    """Translates only description texts inside verified treatment_info dictionary into target language using Gemini."""
+    if not treatment_info or language == "en":
+        return treatment_info
+        
+    try:
+        api_key = _get_api_key()
+        genai.configure(api_key=api_key)
+    except Exception as e:
+        print(f"Gemini API key setup failed for translation: {e}")
+        return treatment_info
+    
+    lang_map = {
+        "en": "English", "te": "Telugu", "hi": "Hindi", "ta": "Tamil",
+        "kn": "Kannada", "ml": "Malayalam", "mr": "Marathi", "bn": "Bengali",
+        "gu": "Gujarati", "pa": "Punjabi", "or": "Odia"
+    }
+    lang_name = lang_map.get(language, "English")
+    
+    prompt = f"""
+You are a translation assistant for a professional agricultural app.
+Translate the following treatment guidance dictionary into: {lang_name}.
+
+AI SAFETY & QUANTITY PRESERVATION RULES:
+1. Do NOT translate or modify any medicine/chemical names, active ingredients, formulations, numbers, quantities, units, application rates, spray intervals, costs, or waiting periods incorrectly.
+2. Keep all numerical values and units (e.g., '10 ml', '5 litres', '15 days', '25°C', '78%', '300.0') exactly as they are in the original English.
+3. Keep the keys of the JSON dictionary exactly the same in English.
+4. Translate ONLY the descriptive strings and list instructions (like elements inside "organic_treatment", "mixing_steps", "precautions", "application_method", "where_to_spray", "spray_timing", "purpose").
+
+Original JSON to translate:
+{json.dumps(treatment_info, default=str)}
+
+Return ONLY valid JSON.
+"""
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        response = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0.1, "response_mime_type": "application/json"}
+        )
+        result_text = response.text.strip()
+        if result_text.startswith("```"):
+            result_text = result_text.replace("```json", "").replace("```", "").strip()
+        translated_data = json.loads(result_text)
+        
+        # Merge back to keep fields like id or other non-translatable fields
+        for k, v in translated_data.items():
+            if k in treatment_info:
+                treatment_info[k] = v
+                
+        return treatment_info
+    except Exception as e:
+        print(f"Failed to translate treatment info via AI: {e}")
+        return treatment_info

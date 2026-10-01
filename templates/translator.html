@@ -1,59 +1,419 @@
-<div id="google_translate_element" class="flex items-center"></div>
+<!-- Google Translate Multilingual Support Component -->
+<style>
+/* ==========================================================================
+   Complete and Total Suppression of Google Translate Banner, Logo & Badges
+   ========================================================================== */
+
+/* 1. Prevent Google Translate from shifting the page down */
+html,
+body,
+body.translated-ltr,
+body.translated-rtl,
+html.translated-ltr,
+html.translated-rtl {
+    top: 0px !important;
+    position: static !important;
+    margin-top: 0px !important;
+    padding-top: 0px !important;
+}
+
+/* 2. Completely hide all Google Translate iframes and top banner bars */
+iframe.goog-te-banner-frame,
+iframe.goog-te-menu-frame,
+iframe.skiptranslate,
+iframe[class*="VIpgJd"],
+iframe[id*=":1.container"],
+iframe[id*=":2.container"],
+iframe[src*="translate.google"],
+.goog-te-banner-frame,
+.goog-te-banner,
+.VIpgJd-ZVi9od-ORHb-OEVmcd,
+.VIpgJd-ZVi9od-xl07Ob-OEVmcd,
+.VIpgJd-ZVi9od-aZ2wEe-wOHMy,
+.VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+.VIpgJd-ZVi9od-l4eHX-hSRLGd,
+.VIpgJd-y6eaKe,
+[class*="VIpgJd-ZVi9od"],
+body > .skiptranslate,
+body > div[class*="skiptranslate"],
+body > div[class*="VIpgJd"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0px !important;
+    width: 0px !important;
+    max-height: 0px !important;
+    max-width: 0px !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    top: -9999px !important;
+    left: -9999px !important;
+    z-index: -99999 !important;
+}
+
+/* 3. Hide all Google logo links, icons, and branding */
+.goog-logo-link,
+.goog-logo-link:link,
+.goog-logo-link:visited,
+.goog-logo-link:hover,
+.goog-logo-link:active,
+.goog-te-gadget-icon,
+img.goog-te-gadget-icon,
+img[src*="googlelogo"],
+img[src*="translate.googleapis.com"],
+img[src*="gstatic.com/images/branding"],
+.goog-te-gadget span,
+.goog-te-gadget a,
+.goog-te-gadget form,
+.goog-te-gadget div,
+.goog-te-gadget img {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0px !important;
+    width: 0px !important;
+    pointer-events: none !important;
+}
+
+/* 4. Hide Google Translate element container completely */
+#google_translate_element {
+    display: none !important;
+}
+
+.goog-te-gadget {
+    color: transparent !important;
+    font-size: 0px !important;
+    line-height: 0 !important;
+}
+
+/* 5. Tooltips, balloons, spinners and text highlights */
+#goog-gt-tt,
+[id*="goog-gt-"],
+.goog-tooltip,
+.goog-tooltip:hover,
+.goog-te-balloon-frame,
+.goog-te-spinner-pos {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.goog-text-highlight {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* ==========================================================================
+   Custom Modern Navbar Language Dropdown Styles
+   ========================================================================== */
+.lang-dropdown-container {
+    position: relative;
+    display: inline-block;
+}
+.lang-dropdown-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.lang-dropdown-btn:hover {
+    border-color: #10b981;
+    background-color: #f9fafb;
+}
+.lang-dropdown-menu {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    margin-top: 0.5rem;
+    width: 12rem;
+    background-color: #ffffff;
+    border: 1px solid #f1f5f9;
+    border-radius: 1rem;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    display: none;
+    max-height: 20rem;
+    overflow-y: auto;
+}
+.lang-dropdown-menu.show {
+    display: block;
+}
+.lang-dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.625rem 1rem;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #4b5563;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.lang-dropdown-item:hover {
+    background-color: #ecfdf5;
+    color: #047857;
+}
+.lang-dropdown-item.active {
+    background-color: #10b981;
+    color: #ffffff;
+}
+
+/* Mobile Language Grid style */
+.mobile-lang-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+}
+.mobile-lang-btn {
+    display: block;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    background-color: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    color: #4b5563;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.mobile-lang-btn:hover {
+    background-color: #ecfdf5;
+    border-color: #10b981;
+    color: #047857;
+}
+.mobile-lang-btn.active {
+    background-color: #10b981;
+    border-color: #10b981;
+    color: #ffffff;
+}
+</style>
+
+<!-- Hidden Google Translate Mount Point -->
+<div id="google_translate_element" style="display:none !important;" class="hidden"></div>
+
+<!-- Desktop Language Dropdown Component -->
+<div class="lang-dropdown-container" id="desktop-lang-container">
+    <button class="lang-dropdown-btn" id="desktop-lang-btn" aria-haspopup="true" aria-expanded="false" type="button">
+        <span class="text-base">🌐</span>
+        <span id="desktop-active-lang-text">English</span>
+        <span class="text-[0.6rem] text-gray-400">▼</span>
+    </button>
+    <div class="lang-dropdown-menu" id="desktop-lang-menu" role="menu">
+        <button class="lang-dropdown-item active" data-lang="en" role="menuitem" type="button" onclick="translatePage('en')">English</button>
+        <button class="lang-dropdown-item" data-lang="hi" role="menuitem" type="button" onclick="translatePage('hi')">हिन्दी (Hindi)</button>
+        <button class="lang-dropdown-item" data-lang="te" role="menuitem" type="button" onclick="translatePage('te')">తెలుగు (Telugu)</button>
+    </div>
+</div>
 
 <script type="text/javascript">
+// Language mapping definition
+const LANG_NAMES = {
+    en: "English",
+    hi: "हिन्दी",
+    te: "తెలుగు"
+};
+
+// 1. Google Translate Init Handler
 function googleTranslateElementInit() {
     new google.translate.TranslateElement({
         pageLanguage: "en",
         includedLanguages: "en,hi,te",
-        layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+        layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        autoDisplay: false
     }, "google_translate_element");
 }
 
+// 2. Active Button & Dropdown UI State Sync
 function setActiveButton(langCode) {
-    const buttons = {
+    if (!langCode) langCode = "en";
+    langCode = langCode.toLowerCase();
+
+    // Update Desktop Dropdown label
+    const desktopText = document.getElementById("desktop-active-lang-text");
+    if (desktopText) {
+        desktopText.textContent = LANG_NAMES[langCode] || "English";
+    }
+
+    // Update Desktop Dropdown active class
+    document.querySelectorAll(".lang-dropdown-item").forEach(item => {
+        if (item.getAttribute("data-lang") === langCode) {
+            item.classList.add("active");
+        } else {
+            item.classList.remove("active");
+        }
+    });
+
+    // Update Homepage cards
+    const homeButtons = {
         en: document.getElementById("btn-en"),
         hi: document.getElementById("btn-hi"),
         te: document.getElementById("btn-te")
     };
-
-    Object.values(buttons).forEach(btn => {
+    Object.entries(homeButtons).forEach(([code, btn]) => {
         if (btn) {
-            btn.classList.remove("border-green-500", "bg-green-50", "text-green-700", "scale-105");
-            btn.classList.add("border-gray-200", "bg-white");
+            if (code === langCode) {
+                btn.classList.remove("border-gray-200", "bg-white");
+                btn.classList.add("border-green-500", "bg-green-50", "text-green-700", "scale-105");
+            } else {
+                btn.classList.remove("border-green-500", "bg-green-50", "text-green-700", "scale-105");
+                btn.classList.add("border-gray-200", "bg-white");
+            }
         }
     });
 
-    if (buttons[langCode]) {
-        buttons[langCode].classList.remove("border-gray-200", "bg-white");
-        buttons[langCode].classList.add("border-green-500", "bg-green-50", "text-green-700", "scale-105");
-    }
+    // Update any navbar / profile buttons
+    document.querySelectorAll('button[onclick*="translatePage"]').forEach(btn => {
+        const match = btn.getAttribute("onclick")?.match(/translatePage\(['"]([^'"]+)['"]\)/);
+        if (match && match[1]) {
+            const btnLang = match[1].toLowerCase();
+            if (btnLang === langCode) {
+                btn.classList.add("bg-green-600", "text-white");
+                btn.classList.remove("bg-white", "text-gray-700");
+            } else {
+                btn.classList.remove("bg-green-600", "text-white");
+                btn.classList.add("bg-white", "text-gray-700");
+            }
+        }
+    });
 }
 
+// 3. Translation trigger
 function translatePage(langCode) {
+    if (!langCode) return;
+    langCode = langCode.toLowerCase();
+    
     setActiveButton(langCode);
     localStorage.setItem("selectedLang", langCode);
 
-    document.cookie = "googtrans=/en/" + langCode + "; path=/";
-    document.cookie = "googtrans=/en/" + langCode + "; path=/; domain=" + location.hostname;
+    // Set Google Translate cookies across all path/domain scopes
+    const cookieVal = "/en/" + langCode;
+    document.cookie = "googtrans=" + cookieVal + "; path=/";
+    document.cookie = "googtrans=" + cookieVal + "; path=/; domain=" + location.hostname;
+    document.cookie = "googtrans=" + cookieVal + "; path=/; domain=127.0.0.1";
+    document.cookie = "googtrans=" + cookieVal + "; path=/; domain=localhost";
+    document.cookie = "selected_lang=" + langCode + "; path=/; max-age=31536000";
 
-    setTimeout(function () {
-        location.reload();
-    }, 500);
+    // Close any open dropdowns
+    const desktopMenu = document.getElementById("desktop-lang-menu");
+    if (desktopMenu) desktopMenu.classList.remove("show");
+
+    // Attempt direct in-page language switch via Google combo selector
+    const combo = document.querySelector('.goog-te-combo');
+    if (combo) {
+        combo.value = langCode;
+        combo.dispatchEvent(new Event('change'));
+    } else {
+        setTimeout(function () {
+            location.reload();
+        }, 300);
+    }
 }
 
-document.addEventListener("DOMContentLoaded", function () {
-    const activeLang = localStorage.getItem("selectedLang") || "en";
-    setActiveButton(activeLang);
+// Make globally accessible
+window.translatePage = translatePage;
 
+// 4. Runtime Continuous Suppression of Google Translate Banner, Logo & Top Margin
+(function suppressGoogleTranslateBanner() {
+    function enforceCleanView() {
+        // Force body and html top back to 0px
+        if (document.body) {
+            if (document.body.style.top && document.body.style.top !== '0px') {
+                document.body.style.top = '0px';
+            }
+            if (document.body.style.position && document.body.style.position !== 'static') {
+                document.body.style.position = 'static';
+            }
+            if (document.body.style.marginTop && document.body.style.marginTop !== '0px') {
+                document.body.style.marginTop = '0px';
+            }
+        }
+        if (document.documentElement && document.documentElement.style.top && document.documentElement.style.top !== '0px') {
+            document.documentElement.style.top = '0px';
+        }
+
+        // Hide and suppress any Google Translate banner iframes, tooltips, or logo links
+        const badElements = document.querySelectorAll(
+            'iframe.goog-te-banner-frame, iframe.goog-te-menu-frame, iframe.skiptranslate, iframe[class*="VIpgJd"], ' +
+            'body > .skiptranslate, body > div[class*="skiptranslate"], body > div[class*="VIpgJd"], ' +
+            '#goog-gt-tt, .goog-te-balloon-frame, .goog-logo-link, img.goog-te-gadget-icon, ' +
+            '.VIpgJd-ZVi9od-aZ2wEe-wOHMy, .VIpgJd-ZVi9od-ORHb-OEVmcd, .VIpgJd-ZVi9od-xl07Ob-OEVmcd, [class*="VIpgJd"]'
+        );
+
+        badElements.forEach(el => {
+            el.style.setProperty('display', 'none', 'important');
+            el.style.setProperty('visibility', 'hidden', 'important');
+            el.style.setProperty('opacity', '0', 'important');
+            el.style.setProperty('height', '0px', 'important');
+            el.style.setProperty('width', '0px', 'important');
+            el.style.setProperty('pointer-events', 'none', 'important');
+        });
+    }
+
+    // Execute immediately and upon lifecycle events
+    enforceCleanView();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', enforceCleanView);
+    }
+    window.addEventListener('load', enforceCleanView);
+
+    // MutationObserver to catch dynamically injected Google Translate banner iframes
+    const observer = new MutationObserver(enforceCleanView);
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['style', 'class'],
+        childList: true,
+        subtree: true
+    });
+
+    // Periodic sweep for the first 8 seconds after load to ensure no top-left logo ever flashes
+    const sweepInterval = setInterval(enforceCleanView, 150);
+    setTimeout(() => clearInterval(sweepInterval), 8000);
+})();
+
+// 5. DOM Initialization
+document.addEventListener("DOMContentLoaded", function () {
+    const currentLang = localStorage.getItem("selectedLang") || "en";
+    setActiveButton(currentLang);
+
+    // Setup desktop dropdown toggle
+    const desktopBtn = document.getElementById("desktop-lang-btn");
+    const desktopMenu = document.getElementById("desktop-lang-menu");
+    if (desktopBtn && desktopMenu) {
+        desktopBtn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            desktopMenu.classList.toggle("show");
+        });
+        document.addEventListener("click", function (e) {
+            if (!desktopMenu.contains(e.target) && e.target !== desktopBtn) {
+                desktopMenu.classList.remove("show");
+            }
+        });
+    }
+
+    // Setup Profile Badge dropdown handling
     const badgeBtn = document.getElementById("profileBadgeBtn");
     const dropdownMenu = document.getElementById("profileDropdownMenu");
-
     if (badgeBtn && dropdownMenu) {
         badgeBtn.addEventListener("click", function (e) {
             e.stopPropagation();
             dropdownMenu.classList.toggle("hidden");
         });
-
         document.addEventListener("click", function (e) {
             if (!dropdownMenu.contains(e.target) && e.target !== badgeBtn) {
                 dropdownMenu.classList.add("hidden");
@@ -63,4 +423,5 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 
+<!-- Official Google Translate Script -->
 <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
